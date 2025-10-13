@@ -1,0 +1,23 @@
+{
+  "name": "arquitecturabase",
+  "version": "1.0.0",
+  "description": "Arquitectura base para el proyecto de la asignatura Procesos de Ingeniería del Software",
+  "main": "index.js",
+  "scripts": {
+    "testW": "node_modules\\.bin\\jasmine-node servidor",
+    "test": "./node_modules/.bin/jasmine-node servidor"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EstherCarrilero/arquitecturabase.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/EstherCarrilero/arquitecturabase/issues"
+  },
+  "homepage": "https://github.com/EstherCarrilero/arquitecturabase#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
