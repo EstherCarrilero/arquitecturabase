@@ -2,7 +2,8 @@
 Arquitectura base para el proyecto de la asignatura Procesos de Ingeniería del Software
 
 # inicialización
-Para iniciar, es necesario instalar dependencias (npm install)
+Para iniciar, es necesario instalar dependencias (npm install).
+Una vez instaladas, la inicialización es posible con el comando 'npm start'.
 
 # pruebas
 Para realizar los tests, se puede usar el comando 'npm test' en una terminal.
