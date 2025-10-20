@@ -1,58 +1,107 @@
 function ControlWeb(){
     this.mostrarAgregarUsuario=function(){
-        let cadena='<div id="mAU" class="form-group">';
-        cadena+='<label for="nick">Name:</label>';
-        cadena+='<input id="nick" type="text" class="form-control">';
-        cadena+='<button  id="btnAU" type="submit" class="btn btn-primary">Submit</button>';
-        cadena+='</div>';
-        $("#au").append(cadena);
+        let cadena = '<div class="card mb-3" id="mAU">';
+            cadena+=' <div class="card-body">';
+            cadena+='<h5 class="card-title">Agregar usuario</h5>';
+            cadena+='<div class="form-group">';
+            cadena+='<label for="nick">Nombre:</label>';
+            cadena+='<input id="nick" type="text" class="form-control">';
+            cadena+='</div>';
+            cadena+='<button id="btnAU" class="btn btn-primary btn-block">Enviar</button>';
+            cadena+='</div></div>';
+        $("#left-cards").append(cadena);
         $("#btnAU").on("click", function(){
             let nick=$("#nick").val();
-            rest.agregarUsuario(nick);  
-            $("#mAU").remove();
+            $("#mAU .alert").remove();
+            if (!nick){
+                $("#mAU .card-body").append('<div class="alert alert-danger mt-2">Por favor introduce un nombre</div>');
+                return;
+            }
+            rest.agregarUsuario(nick);
         });
     }
 
     this.mostrarObtenerUsuarios=function(){
-        $("#au").append('<div id="mOU" class="form-group">'
-            +'<label for="btnOU">Obtener usuarios</label>'
-            +'<button id="btnOU" class="btn btn-secondary">Listar</button>'
-            +'</div>');
+        $("#right-cards").append('<div class="card mb-3" id="mOU">'
+            +'<div class="card-body">'
+            +'<h5 class="card-title">Obtener usuarios</h5>'
+            +'<button id="btnOU" class="btn btn-secondary btn-block">Listar usuarios</button>'
+            +'<div class="mt-3">'
+            +'<table class="table table-sm table-striped" id="tablaUsuarios">'
+            +'<thead><tr><th>Nick</th></tr></thead>'
+            +'<tbody><tr><td><em>...</em></td></tr></tbody>'
+            +'</table>'
+            +'</div>'
+            +'</div></div>');
         $("#btnOU").on('click', function(){
             rest.obtenerUsuarios();
         });
     }
 
+    // Para llenar la tabla de susuarios
+    this.llenarTabla = function(data){
+        let tbody = $("#tablaUsuarios tbody");
+        tbody.html('');
+        if (!data || data.length === 0){
+            tbody.append('<tr><td><em>No hay usuarios</em></td></tr>');
+        }
+        else{
+            data.forEach(function(u){
+                var nick = u.nick;
+                tbody.append('<tr><td>'+nick+'</td></tr>');
+            });
+        }
+    }
+
     this.mostrarNumeroUsuarios=function(){
-        $("#au").append('<div id="mNU" class="form-group">'
-            +'<label for="btnNU">Número de usuarios</label>'
-            +'<button id="btnNU" class="btn btn-secondary">Contar</button>'
-            +'</div>');
+        $("#right-cards").append('<div class="card mb-3" id="mNU">'
+            +'<div class="card-body">'
+            +'<h5 class="card-title">Número de usuarios</h5>'
+            +'<button id="btnNU" class="btn btn-secondary btn-block">Mostrar número</button>'
+            +'</div></div>');
         $("#btnNU").on('click', function(){
             rest.numeroUsuarios();
         });
     }
 
     this.mostrarUsuarioActivo=function(){
-        $("#au").append('<div id="mUA" class="form-group">'
-            +'<label for="nickAct">Comprobar usuario activo:</label>'
+        $("#left-cards").append('<div class="card mb-3" id="mUA">'
+            +'<div class="card-body">'
+            +'<h5 class="card-title">Comprobar usuario activo</h5>'
+            +'<div class="form-group">'
+            +'<label for="nickAct">Nombre:</label>'
             +'<input id="nickAct" type="text" class="form-control">'
-            +'<button id="btnUA" class="btn btn-secondary">Comprobar</button>'
-            +'</div>');
+            +'</div>'
+            +'<button id="btnUA" class="btn btn-secondary btn-block">Comprobar</button>'
+            +'</div></div>');
         $("#btnUA").on('click', function(){
             let nick = $("#nickAct").val();
+            $("#mUA .alert").remove();
+            if (!nick){
+                $("#mUA .card-body").append('<div class="alert alert-danger mt-2">Por favor introduce un nombre</div>');
+                return;
+            }
             rest.usuarioActivo(nick);
         });
     }
 
     this.mostrarEliminarUsuario=function(){
-        $("#au").append('<div id="mEU" class="form-group">'
-            +'<label for="nickDel">Eliminar usuario:</label>'
+        $("#left-cards").append('<div class="card mb-3" id="mEU">'
+            +'<div class="card-body">'
+            +'<h5 class="card-title">Eliminar usuario</h5>'
+            +'<div class="form-group">'
+            +'<label for="nickDel">Nombre:</label>'
             +'<input id="nickDel" type="text" class="form-control">'
-            +'<button id="btnEU" class="btn btn-danger">Eliminar</button>'
-            +'</div>');
+            +'</div>'
+            +'<button id="btnEU" class="btn btn-danger btn-block">Eliminar</button>'
+            +'</div></div>');
         $("#btnEU").on('click', function(){
             let nick = $("#nickDel").val();
+            $("#mEU .alert").remove();
+            if (!nick){
+                $("#mEU .card-body").append('<div class="alert alert-danger mt-2">Por favor introduce un nombre</div>');
+                return;
+            }
             rest.eliminarUsuario(nick);
         });
     }
