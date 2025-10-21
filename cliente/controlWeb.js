@@ -105,4 +105,34 @@ function ControlWeb(){
             rest.eliminarUsuario(nick);
         });
     }
-}
+
+    this.mostrarBienvenida=function(msg){
+        $("#mensajes").html('<div class="alert alert-info mt-2">'+msg+'</div>');
+        cw.mostrarSalir();
+    }
+
+    this.comprobarSesion=function(){
+        let nick=  $.cookie("nick")// localStorage.getItem("nick");
+        if (nick){
+            cw.mostrarBienvenida("Bienvenido al sistema, "+nick);
+        }
+        else{
+            cw.mostrarAgregarUsuario();
+        }
+    }
+
+    this.salir=function(){
+         $.removeCookie("nick") //localStorage.removeItem("nick");
+        location.reload();
+
+        $("#mensajes").append('<div class="alert alert-info mt-2">Has salido del sistema</div>');
+    }
+
+    this.mostrarSalir=function(){
+        $("#mensajes").append('<button id="btnSalir" class="btn btn-outline-secondary btn-sm ml-2">Salir</button>');
+        $("#btnSalir").on("click", function(){
+            cw.salir();
+        });
+    }
+
+ }

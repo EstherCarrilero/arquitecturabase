@@ -1,19 +1,28 @@
 function ClienteRest(){
     this.agregarUsuario=function(nick){
         var cli=this;
+        let msg="El nick "+nick+" está ocupado";
         $.getJSON("/agregarUsuario/"+nick,function(data){
             $("#mAU .alert").remove();
             if (data.nick!=-1){
                 console.log("Usuario "+nick+" ha sido registrado");
                 
                 $("#mAU .card-body").append('<div class="alert alert-success mt-2">Usuario '+nick+' ha sido registrado</div>');
-                $("#nick").val('');
+                $("#nick").val(''); //RELEGAR TODAS ESTAS LLAMADAS A CONTROLWEB.JS
+
+                msg="Bienvenido al sistema, "+nick;
+                 $.cookie("nick", nick) //localStorage.setItem("nick", nick);
+
+                $("#mAU").hide(); //RARETE???
+
             }
             else{
                 console.log("El nick ya está ocupado");
 
                 $("#mAU .card-body").append('<div class="alert alert-danger mt-2">El nick '+nick+' ya está ocupado</div>');
             }
+
+            cw.mostrarBienvenida(msg);
         });
     }
 
