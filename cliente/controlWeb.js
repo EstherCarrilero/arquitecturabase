@@ -8,6 +8,7 @@ function ControlWeb(){
             cadena+='<input id="nick" type="text" class="form-control">';
             cadena+='</div>';
             cadena+='<button id="btnAU" class="btn btn-primary btn-block">Enviar</button>';
+            cadena=cadena+'<div><a href="/auth/google"><img src="./cliente/img/btn_google_sign_in_web_light_rd_SI@2x.png" style="height:40px;"></a></div>';
             cadena+='</div></div>';
         $("#left-cards").append(cadena);
         $("#btnAU").on("click", function(){

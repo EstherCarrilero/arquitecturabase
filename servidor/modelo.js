@@ -1,5 +1,19 @@
+const datos=require("./cad.js"); 
+
 function Sistema(){ 
     this.usuarios={}; 
+    this.cad=new datos.CAD();
+
+    this.cad.conectar(function(db){ 
+        console.log("Conectado a Mongo Atlas"); 
+    }); 
+
+    this.usuarioGoogle=function(usr,callback){ 
+        this.cad.buscarOCrearUsuario(usr,function(obj){ 
+            callback(obj); 
+        }); 
+    } 
+
     this.agregarUsuario=function(nick){ 
         let res={"nick":-1};
         if (!this.usuarios[nick]){

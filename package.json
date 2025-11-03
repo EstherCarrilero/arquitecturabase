@@ -19,7 +19,11 @@
   },
   "homepage": "https://github.com/EstherCarrilero/arquitecturabase#readme",
   "dependencies": {
+    "cookie-session": "^2.1.1",
     "express": "^5.1.0",
-    "jasmine-node": "^3.0.0"
+    "jasmine-node": "^3.0.0",
+    "mongodb": "^4.4.0",
+    "passport": "^0.5.3",
+    "passport-google-oauth20": "^2.0.0"
   }
 }
