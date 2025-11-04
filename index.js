@@ -6,8 +6,9 @@ const cookieSession=require("cookie-session");
 require("./servidor/passport-setup.js");
 const modelo = require("./servidor/modelo.js");
 const PORT = process.env.PORT || 3000;
+const bodyParser=require("body-parser"); 
 
-let sistema = new modelo.Sistema();
+let sistema = new modelo.Sistema({test:false});
 
 app.use(express.static(__dirname + "/"));
 app.use(cookieSession({
@@ -17,6 +18,10 @@ app.use(cookieSession({
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.use(bodyParser.urlencoded({extended:true})); 
+app.use(bodyParser.json()); 
+
 app.get("/auth/google",passport.authenticate('google', { scope: ['profile','email'] }));
 
 app.get('/google/callback',
@@ -80,4 +85,11 @@ app.get("/eliminarUsuario/:nick",function(request,response){
     let nick=request.params.nick;
     let res = sistema.eliminarUsuario(nick);
     response.send(res);
+});
+
+app.post('/oneTap/callback',  
+passport.authenticate('google-one-tap', { failureRedirect: '/fallo' }), 
+function(req, res) { 
+    // Successful authentication, redirect home. 
+    res.redirect('/good'); 
 });
