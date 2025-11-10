@@ -40,6 +40,39 @@ function CAD(){
             return null;
         }
     } 
+
+    this.buscarUsuario=function(obj,callback){ 
+        buscar(this.usuarios,obj,callback); 
+    }
+
+    this.insertarUsuario=function(usuario,callback){ 
+        insertar(this.usuarios,usuario,callback); 
+    } 
+
+    async function buscar(coleccion, criterio, callback){ 
+        try {
+            const usuarios = await coleccion.find(criterio).toArray();
+            if (usuarios.length === 0){ 
+                callback(undefined);              
+            } else { 
+                callback(usuarios[0]); 
+            } 
+        } catch(error) {
+            console.error("buscar: error:", error);
+            callback(undefined);
+        }
+    } 
+
+    async function insertar(coleccion, elemento, callback){ 
+        try {
+            await coleccion.insertOne(elemento);
+            console.log("Nuevo usuario registrado:", elemento.email);
+            callback(elemento); 
+        } catch(err) {
+            console.error("insertar: error:", err);
+            callback(null);
+        }
+    } 
 } 
 
 module.exports.CAD=CAD; 

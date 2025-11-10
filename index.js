@@ -93,3 +93,59 @@ function(req, res) {
     // Successful authentication, redirect home. 
     res.redirect('/good'); 
 });
+
+app.post("/registrarUsuario", function(request, response){ 
+    const { email, password, nombre, apellidos } = request.body;
+    
+    console.log("Intento de registro:", email);
+    
+    sistema.registrarUsuario({
+        email,
+        password,
+        nombre,
+        apellidos
+    }, function(res){ 
+        if (res && res.email && res.email !== -1) {
+            // Registro exitoso
+            response.send({
+                nick: res.email,
+                email: res.email,
+                nombre: res.nombre,
+                apellidos: res.apellidos
+            }); 
+        } else {
+            // Error en registro
+            response.status(400).send({
+                nick: -1,
+                error: res.error || "Error al registrar usuario"
+            });
+        }
+    }); 
+});
+
+app.post("/iniciarSesion", function(request, response){ 
+    const { email, password } = request.body;
+    
+    console.log("Intento de login:", email);
+    
+    sistema.iniciarSesion({
+        email,
+        password
+    }, function(res){ 
+        if (res && res.nick && res.nick !== -1) {
+            // Login exitoso
+            response.send({
+                nick: res.nick,
+                email: res.email,
+                nombre: res.nombre,
+                apellidos: res.apellidos
+            }); 
+        } else {
+            // Error en login
+            response.status(401).send({
+                nick: -1,
+                error: res.error || "Credenciales incorrectas"
+            });
+        }
+    }); 
+}); 

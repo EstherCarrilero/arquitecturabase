@@ -118,12 +118,13 @@ function ControlWeb(){
             cw.mostrarBienvenida("Bienvenido al sistema, "+nick);
         }
         else{
-            cw.mostrarAgregarUsuario();
+            // Mostrar login por defecto cuando no hay sesión
+            cw.mostrarLogin();
         }
     }
 
     this.salir=function(){
-         $.removeCookie("nick") //localStorage.removeItem("nick");
+        $.removeCookie("nick") //localStorage.removeItem("nick");
         location.reload();
 
         $("#mensajes").append('<div class="alert alert-info mt-2">Has salido del sistema</div>');
@@ -134,6 +135,107 @@ function ControlWeb(){
         $("#btnSalir").on("click", function(){
             cw.salir();
         });
+    }
+
+    this.mostrarRegistro=function(){ 
+        $("#fmRegistro").remove(); 
+        $("#registro").load("./cliente/registro.html",function(){ 
+            $("#btnRegistro").on("click",function(e){ 
+                e.preventDefault(); 
+                
+                // Limpiar alertas previas
+                $("#fmRegistro .alert").remove();
+                
+                let email=$("#email").val().trim(); 
+                let pwd=$("#pwd").val(); 
+                let nombre=$("#nombre").val().trim();
+                let apellidos = $("#apellidos").val().trim();
+                
+                if (!email || !pwd){ 
+                    $("#fmRegistro").append('<div class="alert alert-danger mt-2">Por favor completa todos los campos</div>');
+                    return;
+                }
+                
+                rest.registrarUsuario(email, pwd, nombre, apellidos); 
+                console.log("Intentando registrar:", email, nombre, apellidos); 
+            });
+            
+            // Link para mostrar login desde el registro
+            $("#linkLogin").on("click", function(e){
+                e.preventDefault();
+                cw.mostrarLogin();
+            });
+        }); 
+ 
+    }
+
+    this.mostrarLogin=function(){ 
+        $("#fmLogin").remove(); 
+        $("#login").load("./cliente/login.html",function(){ 
+            $("#btnLogin").on("click",function(e){ 
+                e.preventDefault(); 
+                
+                // Limpiar alertas previas
+                $("#fmLogin .alert").remove();
+                
+                let email=$("#emailLogin").val().trim(); 
+                let pwd=$("#pwdLogin").val(); 
+                
+                // Validaciones
+                if (!email || !pwd){ 
+                    $("#fmLogin").append('<div class="alert alert-danger mt-2">Por favor completa todos los campos</div>');
+                    return;
+                }
+                
+                // Validar formato de email
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    $("#fmLogin").append('<div class="alert alert-danger mt-2">Por favor introduce un email válido</div>');
+                    return;
+                }
+                
+                // Si todo está bien, iniciar sesión
+                rest.iniciarSesion(email, pwd); 
+                console.log("Intentando iniciar sesión:", email); 
+            });
+            
+            // Link para mostrar registro desde el login
+            $("#linkRegistro").on("click", function(e){
+                e.preventDefault();
+                cw.mostrarRegistro();
+            });
+        }); 
+ 
+    }
+
+    this.limpiar=function(){
+        $("#email").val('');
+        $("#pwd").val('');
+        $("#nombre").val('');
+        $("#apellidos").val('');
+        
+        $("#fmRegistro .alert").remove();
+    }
+
+    this.limpiarLogin=function(){
+        $("#emailLogin").val('');
+        $("#pwdLogin").val('');
+        
+        $("#fmLogin .alert").remove();
+        $("#fmLogin").hide();
+    }
+
+    this.mostrarMensaje=function(mensaje, tipo){
+        // tipo puede ser: 'success', 'danger', 'warning', 'info'
+        // Por defecto usamos 'success'
+        if (!tipo) {
+            tipo = 'success';
+        }
+        
+        $("#mensajes .alert").remove();
+        $("#mensajes").html('<div class="alert alert-'+tipo+' mt-2">'+mensaje+'</div>');
+        
+        console.log("Mensaje mostrado:", mensaje);
     }
 
  }

@@ -106,4 +106,72 @@ function ClienteRest(){
             }
         });
     }
+
+    this.registrarUsuario=function(email, password, nombre, apellidos){ 
+        $.ajax({ 
+            type:'POST', 
+            url:'/registrarUsuario', 
+            data: JSON.stringify({"email":email,"password":password,"nombre":nombre,"apellidos":apellidos}), 
+            success:function(data){ 
+                if (data.nick && data.nick !== -1){              
+                    console.log("Usuario "+data.nick+" ha sido registrado"); 
+                    $.cookie("nick", data.nick); 
+                    cw.limpiar(); 
+                    cw.mostrarMensaje("¡Registro exitoso! Bienvenido al sistema, "+data.nombre, "success"); 
+                    cw.mostrarSalir();
+                } 
+                else{ 
+                    console.log("Error en registro:", data.error || "El usuario ya existe"); 
+                    cw.mostrarMensaje(data.error || "El email ya está registrado", "danger");
+                } 
+             }, 
+             error:function(xhr, textStatus, errorThrown){ 
+                console.log("Error en registro - Status: " + textStatus);  
+                console.log("Error: " + errorThrown);
+                
+                let errorMsg = "Error al registrar usuario";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                cw.mostrarMensaje(errorMsg, "danger");
+             }, 
+            contentType:'application/json' 
+        }); 
+    }
+
+    this.iniciarSesion=function(email, password){ 
+        $.ajax({ 
+            type:'POST', 
+            url:'/iniciarSesion', 
+            data: JSON.stringify({"email":email,"password":password}), 
+            success:function(data){ 
+                if (data.nick && data.nick !== -1){              
+                    console.log("Sesión iniciada: "+data.nick); 
+                    $.cookie("nick", data.nick); 
+                    cw.limpiarLogin(); 
+                    cw.mostrarMensaje("¡Bienvenido de nuevo, "+data.nombre+"!", "success"); 
+                    cw.mostrarSalir();
+                    // Recargar la página para mostrar contenido de usuario autenticado
+                    setTimeout(function(){
+                        location.reload();
+                    }, 1500);
+                } 
+                else{ 
+                    console.log("Error en login:", data.error || "Credenciales incorrectas"); 
+                    cw.mostrarMensaje(data.error || "Email o contraseña incorrectos", "danger");
+                } 
+             }, 
+             error:function(xhr, textStatus, errorThrown){ 
+                console.log("Error en login - Status: " + textStatus);  
+                console.log("Error: " + errorThrown);
+                
+                let errorMsg = "Error al iniciar sesión";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                cw.mostrarMensaje(errorMsg, "danger");
+             }, 
+            contentType:'application/json' 
+        }); 
+    }
 }
