@@ -1,4 +1,6 @@
 const datos=require("./cad.js"); 
+const correo=require("./email.js");
+const bcrypt = require("bcrypt");
 
 function Sistema(test){ 
     this.usuarios={}; 
@@ -64,15 +66,18 @@ function Sistema(test){
         }
         
         // Buscar si el usuario ya existe por email
-        this.cad.buscarUsuario({email: obj.email}, function(usr){ 
+        this.cad.buscarUsuario({email: obj.email}, async function(usr){ 
             if (!usr){ 
+                const hash = await bcrypt.hash(obj.password, 10); 
                 // Preparar el objeto usuario con todos los campos
                 const nuevoUsuario = {
                     email: obj.email,
-                    password: obj.password, // En producción deberías hashear con bcrypt
+                    password: hash, // En producción deberías hashear con bcrypt
                     nombre: obj.nombre,
                     apellidos: obj.apellidos,
-                    nick: obj.email
+                    nick: obj.email,
+                    key: Date.now().toString(),
+                    confirmada: false
                 };
                 
                 modelo.cad.insertarUsuario(nuevoUsuario, function(res){ 
@@ -83,6 +88,7 @@ function Sistema(test){
                         callback({"email": -1, error: "Error al insertar en BD"});
                     }
                 }); 
+                correo.enviarEmail(nuevoUsuario.email,nuevoUsuario.key,"Confirmar cuenta");
             } 
             else { 
                 console.log("El usuario ya existe:", obj.email);
@@ -100,11 +106,11 @@ function Sistema(test){
         }
         
         // Buscar usuario por email
-        this.cad.buscarUsuario({email: obj.email}, function(usr){ 
+        this.cad.buscarUsuario({email: obj.email, confirmada: true}, async function(usr){ 
             if (usr){ 
-                // Usuario encontrado, verificar contraseña
-                // En producción deberías usar bcrypt.compare(obj.password, usr.password)
-                if (usr.password === obj.password){
+                // Usuario encontrado, verificar contraseña con bcrypt
+                const passwordValida = await bcrypt.compare(obj.password, usr.password);
+                if (passwordValida){
                     console.log("Login exitoso:", usr.email);
                     callback({
                         nick: usr.email,
@@ -123,6 +129,22 @@ function Sistema(test){
             } 
         }); 
     }
+
+    this.confirmarUsuario=function(obj,callback){ 
+        let modelo=this; 
+        this.cad.buscarUsuario({"email":obj.email,"confirmada":false,"key":obj.key},function(usr){ 
+            if (usr){ 
+                usr.confirmada=true; 
+                modelo.cad.actualizarUsuario(usr,function(res){ 
+                    callback({"email":res.email}); //callback(res) 
+                }) 
+            } 
+            else 
+            { 
+                callback({"email":-1}); 
+            } 
+        }) 
+    } 
 }
 
 function Usuario(nick){ 

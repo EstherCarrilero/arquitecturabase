@@ -115,10 +115,13 @@ function ClienteRest(){
             success:function(data){ 
                 if (data.nick && data.nick !== -1){              
                     console.log("Usuario "+data.nick+" ha sido registrado"); 
-                    $.cookie("nick", data.nick); 
+                    // NO guardar cookie ni iniciar sesión automáticamente
                     cw.limpiar(); 
-                    cw.mostrarMensaje("¡Registro exitoso! Bienvenido al sistema, "+data.nombre, "success"); 
-                    cw.mostrarSalir();
+                    cw.mostrarMensaje("¡Registro exitoso! Revisa tu correo electrónico para confirmar tu cuenta.", "success"); 
+                    // Mostrar el formulario de login después de unos segundos
+                    setTimeout(function() {
+                        cw.mostrarLogin();
+                    }, 3000);
                 } 
                 else{ 
                     console.log("Error en registro:", data.error || "El usuario ya existe"); 
@@ -174,4 +177,11 @@ function ClienteRest(){
             contentType:'application/json' 
         }); 
     }
+
+    this.cerrarSesion=function(){ 
+        $.getJSON("/cerrarSesion",function(){    
+            console.log("Sesión cerrada");   
+            $.removeCookie("nick");      
+        }); 
+    } 
 }

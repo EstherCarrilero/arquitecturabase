@@ -1,8 +1,12 @@
+// Cargar variables de entorno
+require('dotenv').config();
+
 const fs=require("fs");
 const express = require('express');
 const app = express();
 const passport=require("passport");
 const cookieSession=require("cookie-session");
+const LocalStrategy = require('passport-local').Strategy; 
 require("./servidor/passport-setup.js");
 const modelo = require("./servidor/modelo.js");
 const PORT = process.env.PORT || 3000;
@@ -10,14 +14,30 @@ const bodyParser=require("body-parser");
 
 let sistema = new modelo.Sistema({test:false});
 
+const haIniciado=function(request,response,next){ 
+    if (request.user){ 
+        next(); 
+    } 
+    else{ 
+        response.redirect("/") 
+    } 
+} 
+
 app.use(express.static(__dirname + "/"));
 app.use(cookieSession({
     name: 'Sistema',
-    keys: ['key1', 'key2']
+    keys: [process.env.SESSION_SECRET || 'key1', 'key2']
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
+passport.use(new LocalStrategy({usernameField:"email",passwordField:"password"}, 
+    function(email,password,done){ 
+        sistema.iniciarSesion({"email":email,"password":password},function(user){ 
+            return done(null,user);       
+        }) 
+    } 
+)); 
 
 app.use(bodyParser.urlencoded({extended:true})); 
 app.use(bodyParser.json()); 
@@ -65,23 +85,23 @@ app.get("/agregarUsuario/:nick",function(request,response){
     response.send(res);
 });
 
-app.get("/obtenerUsuarios",function(request,response){
+app.get("/obtenerUsuarios",haIniciado,function(request,response){
     let res=sistema.obtenerUsuarios();
     response.send(res);
 });
 
-app.get("/usuarioActivo/:nick",function(request,response){
+app.get("/usuarioActivo/:nick",haIniciado,function(request,response){
     let nick=request.params.nick;
     let res=sistema.usuarioActivo(nick);
     response.send(res);
 });
 
-app.get("/numeroUsuarios",function(request,response){
+app.get("/numeroUsuarios",haIniciado,function(request,response){
     let res=sistema.numeroUsuarios();
     response.send(res);
 });
 
-app.get("/eliminarUsuario/:nick",function(request,response){
+app.get("/eliminarUsuario/:nick",haIniciado,function(request,response){
     let nick=request.params.nick;
     let res = sistema.eliminarUsuario(nick);
     response.send(res);
@@ -123,7 +143,7 @@ app.post("/registrarUsuario", function(request, response){
     }); 
 });
 
-app.post("/iniciarSesion", function(request, response){ 
+app.post("/iniciarSesion", passport.authenticate("local",{failureRedirect:"/fallo",successRedirect: "/ok"}), function(request, response){ 
     const { email, password } = request.body;
     
     console.log("Intento de login:", email);
@@ -148,4 +168,28 @@ app.post("/iniciarSesion", function(request, response){
             });
         }
     }); 
+}); 
+
+app.get("/confirmarUsuario/:email/:key",function(request,response){ 
+  let email=request.params.email; 
+  let key=request.params.key; 
+  sistema.confirmarUsuario({"email":email,"key":key},function(usr){ 
+    if (usr.email!=-1){ 
+        response.cookie('nick',usr.email); 
+    } 
+    response.redirect('/'); 
+  });
+});
+
+app.get("/ok",function(request,response){ 
+    response.send({nick:request.user.email}) 
+}); 
+
+app.get("/cerrarSesion",haIniciado,function(request,response){ 
+    let nick=request.user.nick; 
+    request.logout(); 
+    response.redirect("/"); 
+    if (nick){ 
+        sistema.eliminarUsuario(nick); 
+    } 
 }); 

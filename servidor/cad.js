@@ -6,8 +6,7 @@ function CAD(){
     
     this.conectar=async function(callback){
         let cad=this;
-        let client= new
-        mongo("mongodb+srv://ecp:ecp@cluster0.sn3o5ts.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+        let client= new mongo(process.env.MONGODB_URI);
         await client.connect();
         const database=client.db("sistema");
         cad.usuarios=database.collection("usuarios");
@@ -72,6 +71,22 @@ function CAD(){
             console.error("insertar: error:", err);
             callback(null);
         }
+    } 
+
+    this.actualizarUsuario=function(obj,callback){ 
+        actualizar(this.usuarios,obj,callback); 
+    } 
+
+    function actualizar(coleccion,obj,callback){ 
+        coleccion.findOneAndUpdate({_id:ObjectId(obj._id)}, {$set: obj}, 
+        {upsert: false,returnDocument:"after",projection:{email:1}}, 
+        function(err,doc) { 
+            if (err) { throw err; } 
+            else {  
+                console.log("Elemento actualizado");  
+                callback({email:doc.value.email}); 
+            } 
+        });    
     } 
 } 
 

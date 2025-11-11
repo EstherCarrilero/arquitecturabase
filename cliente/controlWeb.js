@@ -126,6 +126,7 @@ function ControlWeb(){
     this.salir=function(){
         $.removeCookie("nick") //localStorage.removeItem("nick");
         location.reload();
+        rest.cerrarSesion(); 
 
         $("#mensajes").append('<div class="alert alert-info mt-2">Has salido del sistema</div>');
     }

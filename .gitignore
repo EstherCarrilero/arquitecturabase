@@ -1,3 +1,7 @@
 node_modules
 .vscode
-servidor/passport-setup.js
+
+# Environment variables
+.env
+.env.local
+.env.*.local
