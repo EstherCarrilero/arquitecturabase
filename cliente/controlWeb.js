@@ -286,14 +286,14 @@ function ControlWeb(){
                 
                 // Validaciones
                 if (!email || !pwd){ 
-                    $("#fmLogin").append('<div class="alert alert-danger mt-2">Por favor completa todos los campos</div>');
+                    cw.mostrarMensaje("Por favor completa todos los campos", "danger");
                     return;
                 }
                 
                 // Validar formato de email
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(email)) {
-                    $("#fmLogin").append('<div class="alert alert-danger mt-2">Por favor introduce un email válido</div>');
+                    cw.mostrarMensaje("Por favor introduce un email válido", "danger");
                     return;
                 }
                 

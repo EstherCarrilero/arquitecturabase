@@ -70,6 +70,10 @@ app.use((err, req, res, next) => {
 
 app.get("/", function(request,response){
    var contenido=fs.readFileSync(__dirname+"/cliente/index.html");
+   // Reemplazar placeholders con variables de entorno
+   contenido = contenido.toString()
+       .replace("PLACEHOLDER_CLIENT_ID", process.env.GOOGLE_CLIENT_ID)
+       .replace("PLACEHOLDER_LOGIN_URI", `${process.env.APP_URL || 'http://localhost:3000'}/oneTap/callback`);
     response.setHeader("Content-type","text/html");
     response.send(contenido);
 });
@@ -79,7 +83,7 @@ app.listen(PORT, () => {
     console.log('Ctrl+C para salir');
 });
 
-app.get("/agregarUsuario/:nick",function(request,response){
+app.get("/agregarUsuario/:nick",haIniciado,function(request,response){
     let nick=request.params.nick;
     let res=sistema.agregarUsuario(nick);
     response.send(res);
