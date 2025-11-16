@@ -1,4 +1,66 @@
 function ControlWeb(){
+    this.inicializarNavegacion=function(){
+        // Mostrar por defecto la sección de Inicio Sesión si no hay sesión
+        let nick = $.cookie("nick");
+        if (nick) {
+            cw.mostrarSeccion('seccionAcciones');
+        } else {
+            cw.mostrarSeccion('seccionInicioSesion');
+        }
+        
+        // Event listeners para los links de navegación
+        $("#linkInicioSesion").on("click", function(e){
+            e.preventDefault();
+            cw.mostrarSeccion('seccionInicioSesion');
+        });
+        
+        $("#linkAcciones").on("click", function(e){
+            e.preventDefault();
+            cw.mostrarSeccion('seccionAcciones');
+        });
+        
+        $("#linkAcercaDe").on("click", function(e){
+            e.preventDefault();
+            cw.mostrarSeccion('seccionAcercaDe');
+        });
+    }
+    
+    this.mostrarSeccion=function(seccionId){
+        // Ocultar todas las secciones
+        $("#seccionInicioSesion").hide();
+        $("#seccionAcciones").hide();
+        $("#seccionAcercaDe").hide();
+        
+        // Mostrar la sección solicitada
+        $("#" + seccionId).show();
+        
+        // Si vamos a la sección de inicio sesión, actualizar visibilidad según estado de sesión
+        if (seccionId === 'seccionInicioSesion') {
+            let nick = $.cookie("nick");
+            if (nick) {
+                // Hay sesión activa - ocultar elementos de autenticación
+                $("#tituloAutenticacion").hide();
+                $("#googleSignInContainer").hide();
+                $("#separadorAuth").hide();
+            } else {
+                // No hay sesión - mostrar elementos de autenticación
+                $("#tituloAutenticacion").show();
+                $("#googleSignInContainer").show();
+                $("#separadorAuth").show();
+            }
+        }
+        
+        // Actualizar clase active en navbar
+        $(".navbar-nav .nav-link").removeClass("active");
+        if (seccionId === 'seccionInicioSesion') {
+            $("#linkInicioSesion").addClass("active");
+        } else if (seccionId === 'seccionAcciones') {
+            $("#linkAcciones").addClass("active");
+        } else if (seccionId === 'seccionAcercaDe') {
+            $("#linkAcercaDe").addClass("active");
+        }
+    }
+    
     this.mostrarAgregarUsuario=function(){
         let cadena = '<div class="card mb-3" id="mAU">';
             cadena+=' <div class="card-body">';
@@ -8,7 +70,6 @@ function ControlWeb(){
             cadena+='<input id="nick" type="text" class="form-control">';
             cadena+='</div>';
             cadena+='<button id="btnAU" class="btn btn-primary btn-block">Enviar</button>';
-            cadena=cadena+'<div><a href="/auth/google"><img src="./cliente/img/btn_google_sign_in_web_light_rd_SI@2x.png" style="height:40px;"></a></div>';
             cadena+='</div></div>';
         $("#left-cards").append(cadena);
         $("#btnAU").on("click", function(){
@@ -108,38 +169,47 @@ function ControlWeb(){
     }
 
     this.mostrarBienvenida=function(msg){
-        $("#mensajes").html('<div class="alert alert-info mt-2">'+msg+'</div>');
-        cw.mostrarSalir();
-    }
-
-    this.comprobarSesion=function(){
-        let nick=  $.cookie("nick")// localStorage.getItem("nick");
-        if (nick){
-            cw.mostrarBienvenida("Bienvenido al sistema, "+nick);
-        }
-        else{
-            // Mostrar login por defecto cuando no hay sesión
-            cw.mostrarLogin();
-        }
-    }
-
-    this.salir=function(){
-        $.removeCookie("nick") //localStorage.removeItem("nick");
-        location.reload();
-        rest.cerrarSesion(); 
-
-        $("#mensajes").append('<div class="alert alert-info mt-2">Has salido del sistema</div>');
-    }
-
-    this.mostrarSalir=function(){
-        $("#mensajes").append('<button id="btnSalir" class="btn btn-outline-secondary btn-sm ml-2">Salir</button>');
+        $("#mensajes").html('<div class="alert alert-info mt-2 d-flex justify-content-between align-items-center">'+
+            '<span>'+msg+'</span>'+
+            '<button id="btnSalir" class="btn btn-light btn-sm ml-3">Salir</button>'+
+        '</div>');
         $("#btnSalir").on("click", function(){
             cw.salir();
         });
     }
 
+    this.comprobarSesion=function(){
+        let nick = $.cookie("nick");
+        if (nick){
+            cw.mostrarBienvenida("Bienvenido al sistema, "+nick);
+            cw.mostrarSeccion('seccionAcciones');
+        }
+        else{
+            // Mostrar login por defecto cuando no hay sesión
+            cw.mostrarLogin();
+            cw.mostrarSeccion('seccionInicioSesion');
+        }
+    }
+
+    this.salir=function(){
+        $.removeCookie("nick");
+        rest.cerrarSesion();
+        cw.mostrarMensaje("Has salido del sistema correctamente", "info");
+        // Redirigir a la sección de inicio de sesión
+        setTimeout(function(){
+            location.reload();
+        }, 1000);
+    }
+
+    this.mostrarSalir=function(){
+        // Función obsoleta - ahora el botón se crea en mostrarBienvenida
+    }
+
     this.mostrarRegistro=function(){ 
-        $("#fmRegistro").remove(); 
+        $("#fmRegistro").remove();
+        $("#fmLogin").remove(); // Ocultar el formulario de login
+        $("#login").html(''); // Limpiar el contenedor de login
+        
         $("#registro").load("./cliente/registro.html",function(){ 
             $("#btnRegistro").on("click",function(e){ 
                 e.preventDefault(); 
@@ -171,7 +241,39 @@ function ControlWeb(){
     }
 
     this.mostrarLogin=function(){ 
-        $("#fmLogin").remove(); 
+        $("#fmLogin").remove();
+        $("#fmRegistro").remove(); // Ocultar el formulario de registro
+        $("#registro").html(''); // Limpiar el contenedor de registro
+        
+        // Si hay sesión activa en la sección de inicio sesión, mostrar botón de salir
+        let nick = $.cookie("nick");
+        if (nick) {
+            // Ocultar título, botón de Google y separador
+            $("#tituloAutenticacion").hide();
+            $("#googleSignInContainer").hide();
+            $("#separadorAuth").hide();
+            
+            $("#login").html('<div class="text-center mt-5">'+
+                '<div class="card mx-auto" style="max-width: 400px;">'+
+                '<div class="card-body">'+
+                '<h5 class="card-title">Sesión activa</h5>'+
+                '<p class="card-text">Has iniciado sesión como:</p>'+
+                '<h6 class="text-primary mb-4">'+nick+'</h6>'+
+                '<button id="btnSalirLogin" class="btn btn-danger btn-lg btn-block">Cerrar Sesión</button>'+
+                '</div>'+
+                '</div>'+
+            '</div>');
+            $("#btnSalirLogin").on("click", function(){
+                cw.salir();
+            });
+            return;
+        }
+        
+        // Si no hay sesión, mostrar todo
+        $("#tituloAutenticacion").show();
+        $("#googleSignInContainer").show();
+        $("#separadorAuth").show();
+        
         $("#login").load("./cliente/login.html",function(){ 
             $("#btnLogin").on("click",function(e){ 
                 e.preventDefault(); 

@@ -83,12 +83,18 @@ function Sistema(test){
                 modelo.cad.insertarUsuario(nuevoUsuario, function(res){ 
                     if (res) {
                         console.log("Usuario registrado correctamente:", res.email);
+                        
+                        // Enviar email de confirmación
+                        correo.enviarEmail(nuevoUsuario.email, nuevoUsuario.key, "Confirmar cuenta")
+                            .catch((err) => {
+                                console.error("Error al enviar correo:", err);
+                            });
+                        
                         callback(res); 
                     } else {
                         callback({"email": -1, error: "Error al insertar en BD"});
                     }
-                }); 
-                correo.enviarEmail(nuevoUsuario.email,nuevoUsuario.key,"Confirmar cuenta");
+                });
             } 
             else { 
                 console.log("El usuario ya existe:", obj.email);

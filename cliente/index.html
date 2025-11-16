@@ -27,43 +27,77 @@
 
         <nav class="navbar navbar-expand-sm bg-dark navbar-dark">
             <!-- Brand/logo -->
-            <a class="navbar-brand" href="#">Logo</a>
+            <a class="navbar-brand" href="#">Procesos2526</a>
 
             <!-- Links -->
             <ul class="navbar-nav">
                 <li class="nav-item">
-                    <a class="nav-link" href="#">Link 1</a>
+                    <a class="nav-link" href="#" id="linkInicioSesion">Inicio sesión</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="#">Link 2</a>
+                    <a class="nav-link" href="#" id="linkAcciones">Acciones</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="#">Link 3</a>
+                    <a class="nav-link" href="#" id="linkAcercaDe">Acerca de</a>
                 </li>
             </ul>
         </nav>
 
-        <div class="container-fluid">
-            <h3>Mi aplicación</h3>
-            <p>Esta aplicación permite gestionar usuarios de forma sencilla.</p>
+        <div class="container-fluid mt-3">
             <div id="mensajes"></div>
-            <div class="row">
-                <div class="col-md-5">
-                    <div id="left-cards"></div>
-                </div>
-                <div class="col-md-7">
-                    <div id="right-cards"></div>
+            
+            <!-- Sección Inicio Sesión -->
+            <div id="seccionInicioSesion" style="display:none;">
+                <h3 id="tituloAutenticacion">Sistema de Autenticación</h3>
+                <div class="row">
+                    <div class="col-md-6 offset-md-3">
+                        <!-- Botón de Google Sign-In personalizado -->
+                        <div class="mb-3 text-center" id="googleSignInContainer">
+                            <div id="g_id_signin" 
+                                 data-type="standard"
+                                 data-size="large"
+                                 data-theme="outline"
+                                 data-text="signin_with"
+                                 data-shape="rectangular"
+                                 data-logo_alignment="left"
+                                 data-width="280">
+                            </div>
+                        </div>
+                        <hr id="separadorAuth">
+                        <div id="login"></div>
+                        <div id="registro"></div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="container"> 
-            <h3>Sistema</h3> 
-            <div id="au"></div> 
-            <div id="login"></div>
-            <div id="registro"></div> 
-            <div id="msg"></div> 
-        </div> 
+            <!-- Sección Acciones -->
+            <div id="seccionAcciones" style="display:none;">
+                <h3>Gestión de Usuarios</h3>
+                <p>Acciones disponibles para gestionar usuarios del sistema.</p>
+                <div class="row">
+                    <div class="col-md-5">
+                        <div id="left-cards"></div>
+                    </div>
+                    <div class="col-md-7">
+                        <div id="right-cards"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección Acerca de -->
+            <div id="seccionAcercaDe" style="display:none;">
+                <h3>Acerca de</h3>
+                <p>Esta aplicación permite gestionar usuarios de forma sencilla utilizando Node.js, Express, MongoDB y autenticación con Google OAuth.</p>
+                <h5>Características:</h5>
+                <ul>
+                    <li>Registro de usuarios locales con confirmación por email</li>
+                    <li>Inicio de sesión con Google OAuth 2.0</li>
+                    <li>Google One Tap para acceso rápido</li>
+                    <li>Gestión completa de usuarios (agregar, eliminar, listar)</li>
+                    <li>Contraseñas cifradas con bcrypt</li>
+                </ul>
+            </div>
+        </div>
 
 
         <script src="./cliente/clienteRest.js"></script>
@@ -72,8 +106,15 @@
         <script>
             rest=new ClienteRest();
             cw=new ControlWeb();
-            // cw.mostrarAgregarUsuario();
+            
+            // Inicializar navegación
+            cw.inicializarNavegacion();
+            
+            // Comprobar sesión
             cw.comprobarSesion();
+            
+            // Inicializar las cards de acciones (ocultas por defecto)
+            cw.mostrarAgregarUsuario();
             cw.mostrarEliminarUsuario();
             cw.mostrarUsuarioActivo();
             cw.mostrarNumeroUsuarios();
