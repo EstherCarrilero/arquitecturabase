@@ -4,6 +4,8 @@ require('dotenv').config();
 const fs=require("fs");
 const express = require('express');
 const app = express();
+const httpServer = require('http').Server(app); 
+const { Server } = require("socket.io"); 
 const passport=require("passport");
 const cookieSession=require("cookie-session");
 const LocalStrategy = require('passport-local').Strategy; 
@@ -11,8 +13,18 @@ require("./servidor/passport-setup.js");
 const modelo = require("./servidor/modelo.js");
 const PORT = process.env.PORT || 3000;
 const bodyParser=require("body-parser"); 
+const moduloWS = require("./servidor/servidorWS.js"); 
 
 let sistema = new modelo.Sistema({test:false});
+let ws = new moduloWS.WSServer(); 
+let io = new Server(); 
+
+httpServer.listen(PORT, () => { 
+    console.log(`App está escuchando en el puerto ${PORT}`); 
+    console.log('Ctrl+C para salir'); 
+}); 
+io.listen(httpServer); 
+ws.lanzarServer(io, sistema); 
 
 const haIniciado=function(request,response,next){ 
     if (request.user){ 

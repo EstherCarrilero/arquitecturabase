@@ -4,28 +4,55 @@ const bcrypt = require("bcrypt");
 
 function Sistema(test){ 
     this.usuarios={}; 
+    this.partidas={}; 
     this.cad=new datos.CAD();
+    this.dbReady = false;
+    this.dbReadyCallbacks = [];
 
     if (!test.test) {
-    this.cad.conectar(function(db){ 
-        console.log("Conectado a Mongo Atlas"); 
-    }); 
+        let sistema = this;
+        this.cad.conectar(function(db){ 
+            if (db) {
+                console.log("Conectado a Mongo Atlas"); 
+                sistema.dbReady = true;
+                // Ejecutar callbacks pendientes
+                sistema.dbReadyCallbacks.forEach(cb => cb());
+                sistema.dbReadyCallbacks = [];
+            } else {
+                console.error("ERROR: No se pudo conectar a Mongo Atlas");
+            }
+        }); 
+    }
+
+    this.whenDbReady = function(callback) {
+        if (this.dbReady) {
+            callback();
+        } else {
+            this.dbReadyCallbacks.push(callback);
+        }
     }
 
     this.usuarioGoogle=function(usr,callback){ 
-        this.cad.buscarOCrearUsuario(usr,function(obj){ 
-            callback(obj); 
-        }); 
+        let sistema = this;
+        this.whenDbReady(function() {
+            sistema.cad.buscarOCrearUsuario(usr,function(obj){ 
+                callback(obj); 
+            });
+        });
     } 
 
     this.agregarUsuario=function(nick){ 
         let res={"nick":-1};
-        if (!this.usuarios[nick]){
-        this.usuarios[nick]=new Usuario(nick);
-        res.nick=nick;
+        // Si se pasa un objeto Usuario, extraer el nick
+        let nickStr = (typeof nick === 'object' && nick.nick) ? nick.nick : nick;
+        let usuario = (typeof nick === 'object') ? nick : new Usuario(nick);
+        
+        if (!this.usuarios[nickStr]){
+            this.usuarios[nickStr]=usuario;
+            res.nick=nickStr;
         }
         else{
-            console.log("el nick "+nick+" está en uso");
+            console.log("el nick "+nickStr+" está en uso");
         }
         return res;
     } 
@@ -55,6 +82,21 @@ function Sistema(test){
         let res = {"num":0};
         res.num = Object.keys(this.usuarios).length;
         return res;
+    }
+
+    this.obtenerCodigo=function(){
+        let codigo = "";
+        const caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        const longitud = 6;
+        
+        do {
+            codigo = "";
+            for (let i = 0; i < longitud; i++) {
+                codigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+            }
+        } while (this.partidas[codigo]); // Repetir si el código ya existe
+        
+        return codigo;
     }
 
     this.registrarUsuario=function(obj,callback){ 
@@ -151,10 +193,156 @@ function Sistema(test){
             } 
         }) 
     } 
+
+    this.crearPartida=function(email, callback){ 
+        let modelo = this;
+        
+        // Buscar el usuario en la base de datos
+        this.whenDbReady(function() {
+            modelo.cad.buscarUsuario({email: email}, function(usuario) {
+                if (usuario) {
+                    // Obtener un código único
+                    let codigo = modelo.obtenerCodigo();
+                    
+                    // Crear partida con ese código
+                    let partida = new Partida(codigo);
+                    
+                    // Asignar al usuario como jugador de la partida
+                    partida.jugadores.push({
+                        email: usuario.email,
+                        nick: usuario.nick || usuario.email,
+                        nombre: usuario.nombre
+                    });
+                    
+                    // Guardar la partida en la colección
+                    modelo.partidas[codigo] = partida;
+                    
+                    callback({codigo: codigo});
+                } else {
+                    console.log("Usuario no encontrado en BD:", email);
+                    callback({codigo: -1});
+                }
+            });
+        });
+    }
+
+    this.unirAPartida=function(email, codigo, callback){
+        let modelo = this;
+        
+        // Obtener la partida cuyo código es "codigo"
+        let partida = this.partidas[codigo];
+        
+        if (!partida) {
+            console.log("Partida no encontrada:", codigo);
+            callback({codigo: -1, error: "Partida no encontrada"});
+            return;
+        }
+        
+        // Buscar el usuario en la base de datos
+        this.whenDbReady(function() {
+            modelo.cad.buscarUsuario({email: email}, function(usuario) {
+                if (usuario) {
+                    // Verificar que la partida no esté llena
+                    if (partida.jugadores.length < partida.maxJug) {
+                        // Verificar que el usuario no esté ya en la partida
+                        let yaEnPartida = partida.jugadores.some(j => j.email === email);
+                        if (!yaEnPartida) {
+                            // Asignar al usuario a la partida
+                            partida.jugadores.push({
+                                email: usuario.email,
+                                nick: usuario.nick || usuario.email,
+                                nombre: usuario.nombre
+                            });
+                            callback({codigo: codigo});
+                        } else {
+                            console.log("El usuario ya está en la partida");
+                            callback({codigo: -1, error: "Usuario ya en partida"});
+                        }
+                    } else {
+                        console.log("La partida está llena");
+                        callback({codigo: -1, error: "Partida llena"});
+                    }
+                } else {
+                    console.log("Usuario no encontrado en BD:", email);
+                    callback({codigo: -1, error: "Usuario no encontrado"});
+                }
+            });
+        });
+    }
+
+    this.abandonarPartida=function(email, codigo){
+        let partida = this.partidas[codigo];
+        
+        if (!partida) {
+            console.log("Partida no encontrada:", codigo);
+            return {eliminada: false};
+        }
+        
+        console.log("=== DEBUG abandonarPartida ===");
+        console.log("Email que abandona:", email);
+        console.log("Código partida:", codigo);
+        console.log("Jugadores en partida:", partida.jugadores);
+        console.log("Email del creador (jugador[0]):", partida.jugadores[0] ? partida.jugadores[0].email : "N/A");
+        
+        // Verificar si el usuario que abandona es el creador (primer jugador)
+        if (partida.jugadores.length > 0 && partida.jugadores[0].email === email) {
+            // Es el creador, eliminar la partida completamente
+            delete this.partidas[codigo];
+            console.log("✓ ES EL CREADOR - Partida eliminada:", codigo);
+            return {eliminada: true, esCreador: true};
+        } else {
+            // No es el creador, remover al jugador del array pero mantener la partida
+            partida.jugadores = partida.jugadores.filter(j => j.email !== email);
+            console.log("✗ NO ES EL CREADOR - Jugador removido, partida mantenida:", codigo);
+            console.log("Jugadores restantes:", partida.jugadores);
+            return {eliminada: false, esCreador: false};
+        }
+    }
+
+    this.obtenerPartidasDisponibles=function(){ 
+        let lista=[]; 
+        for(var e in this.partidas){ 
+            let partida = this.partidas[e];
+            
+            // Comprobar si la partida está disponible (no llena)
+            if (partida.jugadores.length < partida.maxJug) {
+                // Obtener el email del creador de la partida (primer jugador)
+                let emailCreador = partida.jugadores[0] ? partida.jugadores[0].email : "";
+                
+                // Obtener el código de la partida
+                let codigo = partida.codigo;
+                
+                // Crear un objeto JSON con esos dos datos
+                let objetoPartida = {
+                    codigo: codigo,
+                    creador: emailCreador,
+                    jugadores: partida.jugadores.length,
+                    maxJugadores: partida.maxJug
+                };
+                
+                // Meter el objeto JSON en el array lista
+                lista.push(objetoPartida);
+            }
+        } 
+        return lista; 
+    } 
 }
 
-function Usuario(nick){ 
-    this.nick=nick; 
+function Usuario(data){ 
+    if (typeof data === 'string') {
+        this.nick = data;
+    } else if (typeof data === 'object') {
+        this.nick = data.nick;
+        this.email = data.email;
+        this.nombre = data.nombre;
+        this.apellidos = data.apellidos;
+    }
 } 
 
 module.exports.Sistema=Sistema;
+
+function Partida(codigo){ 
+    this.codigo = codigo; 
+    this.jugadores = []; 
+    this.maxJug = 2; 
+} 

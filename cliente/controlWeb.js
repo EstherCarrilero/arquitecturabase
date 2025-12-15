@@ -19,6 +19,11 @@ function ControlWeb(){
             cw.mostrarSeccion('seccionAcciones');
         });
         
+        $("#linkPartidas").on("click", function(e){
+            e.preventDefault();
+            cw.mostrarSeccion('seccionPartidas');
+        });
+        
         $("#linkAcercaDe").on("click", function(e){
             e.preventDefault();
             cw.mostrarSeccion('seccionAcercaDe');
@@ -28,6 +33,7 @@ function ControlWeb(){
     this.mostrarSeccion=function(seccionId){
         // Ocultar todas las secciones
         $("#seccionInicioSesion").hide();
+        $("#seccionPartidas").hide();
         $("#seccionAcciones").hide();
         $("#seccionAcercaDe").hide();
         
@@ -54,6 +60,10 @@ function ControlWeb(){
         $(".navbar-nav .nav-link").removeClass("active");
         if (seccionId === 'seccionInicioSesion') {
             $("#linkInicioSesion").addClass("active");
+        } else if (seccionId === 'seccionPartidas') {
+            $("#linkPartidas").addClass("active");
+            // Inicializar la sección de partidas
+            cw.inicializarPartidas();
         } else if (seccionId === 'seccionAcciones') {
             $("#linkAcciones").addClass("active");
         } else if (seccionId === 'seccionAcercaDe') {
@@ -182,7 +192,7 @@ function ControlWeb(){
         let nick = $.cookie("nick");
         if (nick){
             cw.mostrarBienvenida("Bienvenido al sistema, "+nick);
-            cw.mostrarSeccion('seccionAcciones');
+            cw.mostrarSeccion('seccionPartidas');
         }
         else{
             // Mostrar login por defecto cuando no hay sesión
@@ -211,7 +221,8 @@ function ControlWeb(){
         $("#login").html(''); // Limpiar el contenedor de login
         
         $("#registro").load("./cliente/registro.html",function(){ 
-            $("#btnRegistro").on("click",function(e){ 
+            // Usar delegación de eventos
+            $(document).off("click", "#btnRegistro").on("click", "#btnRegistro", function(e){ 
                 e.preventDefault(); 
                 
                 // Limpiar alertas previas
@@ -231,9 +242,10 @@ function ControlWeb(){
                 console.log("Intentando registrar:", email, nombre, apellidos); 
             });
             
-            // Link para mostrar login desde el registro
-            $("#linkLogin").on("click", function(e){
+            // Link para mostrar login desde el registro con delegación de eventos
+            $(document).off("click", "#linkLogin").on("click", "#linkLogin", function(e){
                 e.preventDefault();
+                console.log("Click en linkLogin detectado");
                 cw.mostrarLogin();
             });
         }); 
@@ -275,7 +287,8 @@ function ControlWeb(){
         $("#separadorAuth").show();
         
         $("#login").load("./cliente/login.html",function(){ 
-            $("#btnLogin").on("click",function(e){ 
+            // Usar delegación de eventos para manejar clicks en botones/enlaces cargados dinámicamente
+            $(document).off("click", "#btnLogin").on("click", "#btnLogin", function(e){ 
                 e.preventDefault(); 
                 
                 // Limpiar alertas previas
@@ -302,9 +315,10 @@ function ControlWeb(){
                 console.log("Intentando iniciar sesión:", email); 
             });
             
-            // Link para mostrar registro desde el login
-            $("#linkRegistro").on("click", function(e){
+            // Link para mostrar registro desde el login con delegación de eventos
+            $(document).off("click", "#linkRegistro").on("click", "#linkRegistro", function(e){
                 e.preventDefault();
+                console.log("Click en linkRegistro detectado");
                 cw.mostrarRegistro();
             });
         }); 
@@ -335,10 +349,156 @@ function ControlWeb(){
             tipo = 'success';
         }
         
-        $("#mensajes .alert").remove();
-        $("#mensajes").html('<div class="alert alert-'+tipo+' mt-2">'+mensaje+'</div>');
+        $("#notificaciones .alert").remove();
+        $("#notificaciones").html(`
+            <div class="alert alert-${tipo} alert-dismissible fade show mt-2" role="alert">
+                ${mensaje}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        `);
+        
+        // Auto-ocultar después de 5 segundos
+        setTimeout(function(){
+            $("#notificaciones .alert").fadeOut(function(){
+                $(this).remove();
+            });
+        }, 5000);
         
         console.log("Mensaje mostrado:", mensaje);
+    }
+
+    // ========== GESTIÓN DE PARTIDAS ==========
+    
+    this.inicializarPartidas=function(){
+        // Limpiar mensaje previo si existe
+        $("#mensajeSinSesion").remove();
+        
+        // Verificar si hay sesión iniciada
+        let nick = $.cookie("nick");
+        
+        if (!nick) {
+            // No hay sesión - mostrar mensaje informativo
+            $("#cardsPartidas").hide();
+            $("#estadoPartidaActual").hide();
+            $("#seccionPartidas").append(`
+                <div id="mensajeSinSesion" class="alert alert-warning mt-3">
+                    <h5><i class="fas fa-info-circle"></i> Inicia sesión para jugar</h5>
+                    <p class="mb-0">Debes iniciar sesión para poder crear o unirte a partidas.</p>
+                    <a href="#" id="linkIrALogin" class="btn btn-primary mt-2">Ir a Inicio de Sesión</a>
+                </div>
+            `);
+            
+            $("#linkIrALogin").on("click", function(e){
+                e.preventDefault();
+                cw.mostrarSeccion('seccionInicioSesion');
+            });
+            return;
+        }
+        
+        // Hay sesión - mostrar interfaz normal
+        $("#cardsPartidas").show();
+        
+        // Configurar botón de crear partida
+        $("#btnCrearPartida").off("click").on("click", function(){
+            ws.crearPartida();
+        });
+        
+        // Botón para abandonar partida
+        $("#btnAbandonarPartida").off("click").on("click", function(){
+            cw.abandonarPartida();
+        });
+        
+        // Limpiar estado de partida
+        $("#estadoPartida").html("");
+        $("#cardsPartidas").show();
+        $("#estadoPartidaActual").hide();
+        
+        // Solicitar lista de partidas disponibles al cargar la sección
+        ws.solicitarLista();
+    }
+    
+    this.mostrarEsperandoRival=function(codigo){
+        // Ocultar cards y mostrar estado
+        $("#cardsPartidas").hide();
+        $("#estadoPartidaActual").show();
+        
+        $("#estadoPartida").html(`
+            <div class="alert alert-info">
+                <h6><i class="fas fa-spinner fa-spin"></i> Esperando rival...</h6>
+                <p class="mb-1">Código de partida: <strong>${codigo}</strong></p>
+                <small>Comparte este código con otro jugador para que se una</small>
+            </div>
+        `);
+    }
+    
+    this.mostrarPartidaCompleta=function(codigo){
+        // Ocultar cards y mostrar estado
+        $("#cardsPartidas").hide();
+        $("#estadoPartidaActual").show();
+        
+        $("#estadoPartida").html(`
+            <div class="alert alert-success">
+                <h6><i class="fas fa-check-circle"></i> ¡Partida completa!</h6>
+                <p class="mb-0">Código: <strong>${codigo}</strong></p>
+                <p class="mb-0">¡La partida está lista para comenzar!</p>
+            </div>
+        `);
+    }
+    
+    this.abandonarPartida=function(){
+        // Notificar al servidor antes de limpiar
+        if (ws.codigo) {
+            ws.abandonarPartida(ws.codigo);
+        }
+        
+        // Volver a mostrar los cards
+        $("#cardsPartidas").show();
+        $("#estadoPartidaActual").hide();
+        $("#estadoPartida").html("");
+        
+        // Limpiar código de partida
+        ws.codigo = undefined;
+        
+        // Solicitar lista actualizada de partidas
+        ws.solicitarLista();
+        
+        this.mostrarMensaje("Has abandonado la partida", "info");
+    }
+    
+    this.mostrarListaPartidas=function(lista){
+        if (!lista || lista.length === 0) {
+            $("#listaPartidas").html('<p class="text-muted">No hay partidas disponibles en este momento.</p>');
+            return;
+        }
+        
+        let html = '<div class="table-responsive"><table class="table table-hover">';
+        html += '<thead class="thead-light"><tr><th>Código</th><th>Creador</th><th>Jugadores</th><th>Acción</th></tr></thead>';
+        html += '<tbody>';
+        
+        lista.forEach(function(partida){
+            html += '<tr>';
+            html += '<td><code>' + partida.codigo + '</code></td>';
+            html += '<td>' + (partida.creador || 'Anónimo') + '</td>';
+            html += '<td>' + partida.jugadores + '/' + partida.maxJugadores + '</td>';
+            html += '<td><button class="btn btn-sm btn-primary btnUnirse" data-codigo="' + partida.codigo + '">Unirse</button></td>';
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table></div>';
+        $("#listaPartidas").html(html);
+        
+        // Event listener para botones de unirse
+        $(".btnUnirse").off("click").on("click", function(){
+            let codigo = $(this).data("codigo");
+            let nick = $.cookie("nick");
+            if (!nick) {
+                cw.mostrarMensaje("Debes iniciar sesión para unirte a una partida", "warning");
+                return;
+            }
+            ws.unirAPartida(codigo);
+        });
     }
 
  }

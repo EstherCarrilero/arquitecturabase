@@ -16,6 +16,8 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js" integrity="sha512-3j3VU6WC5rPQB4Ld1jnLV7Kd5xr+cq9avvhwqzbH/taCRNURoeEpoPBK9pDyeukwSxwRPJ8fDgvYXd6SkaZ2TA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         <!-- Para Google One Tap -->
         <script src="https://accounts.google.com/gsi/client" async defer></script> 
+        <!-- Socket.io -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js" integrity="sha512-8BHxHDLsOHx+flIrQ0DrZcea7MkHqRU5GbTHmbdzMRnAaoCIkZ97PqZcXJkKZckMMhqfoeaJE+DNUVuyoQsO3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     </head> 
     <body> 
         <div 
@@ -35,6 +37,9 @@
                     <a class="nav-link" href="#" id="linkInicioSesion">Inicio sesión</a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" href="#" id="linkPartidas">Partidas</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="#" id="linkAcciones">Acciones</a>
                 </li>
                 <li class="nav-item">
@@ -45,6 +50,7 @@
 
         <div class="container-fluid mt-3">
             <div id="mensajes"></div>
+            <div id="notificaciones"></div>
             
             <!-- Sección Inicio Sesión -->
             <div id="seccionInicioSesion" style="display:none;">
@@ -68,6 +74,50 @@
                         <hr id="separadorAuth">
                         <div id="login"></div>
                         <div id="registro"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección Partidas -->
+            <div id="seccionPartidas" style="display:none;">
+                <h3>Partidas</h3>
+                
+                <!-- Cards de crear/unirse -->
+                <div id="cardsPartidas" class="row">
+                    <!-- Card para crear partida -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5>Crear Nueva Partida</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Crea una partida y espera a que otro jugador se una.</p>
+                                <button id="btnCrearPartida" class="btn btn-success btn-block">Crear Partida</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Card para unirse a partidas -->
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5>Partidas Disponibles</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Únete a una partida existente.</p>
+                                <div id="listaPartidas"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Estado de partida actual (oculto inicialmente) -->
+                <div id="estadoPartidaActual" style="display:none;">
+                    <div class="card">
+                        <div class="card-body">
+                            <div id="estadoPartida"></div>
+                            <button id="btnAbandonarPartida" class="btn btn-danger mt-3">Abandonar Partida</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -103,10 +153,12 @@
 
 
         <script src="./cliente/clienteRest.js"></script>
+        <script src="./cliente/clienteWS.js"></script>
         <script src="./cliente/controlWeb.js"></script>
 
         <script>
             rest=new ClienteRest();
+            ws=new ClienteWS();
             cw=new ControlWeb();
             
             // Inicializar navegación

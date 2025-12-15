@@ -6,11 +6,16 @@ function CAD(){
     
     this.conectar=async function(callback){
         let cad=this;
-        let client= new mongo(process.env.MONGODB_URI);
-        await client.connect();
-        const database=client.db("sistema");
-        cad.usuarios=database.collection("usuarios");
-        callback(database);
+        try {
+            let client= new mongo(process.env.MONGODB_URI);
+            await client.connect();
+            const database=client.db("sistema");
+            cad.usuarios=database.collection("usuarios");
+            callback(database);
+        } catch (error) {
+            console.error("Error al conectar a MongoDB:", error);
+            callback(null);
+        }
     }
 
     this.buscarOCrearUsuario=function(usr,callback){

@@ -1,15 +1,24 @@
 const nodemailer = require('nodemailer'); 
 const url = process.env.APP_URL || "http://localhost:3000/"; 
- 
-const transporter = nodemailer.createTransport({ 
+
+// Usar variables de entorno directamente (para local y Cloud Run con Secret Manager)
+let transporter = nodemailer.createTransport({ 
     service: 'gmail', 
     auth: { 
         user: process.env.GMAIL_USER, 
         pass: process.env.GMAIL_PASS 
     } 
 }); 
- 
-//send(); 
+
+// COMENTADO: Solo para Cloud Run sin Secret Manager como variables de entorno
+// const gv = require('./gestorVariables.js'); 
+// gv.obtenerOptions(function(res){ 
+//     options = res; 
+//     transporter = nodemailer.createTransport({ 
+//         service: 'gmail', 
+//         auth: options 
+//     }); 
+// }); 
  
 module.exports.enviarEmail=async function(direccion, key,men) { 
     try {
