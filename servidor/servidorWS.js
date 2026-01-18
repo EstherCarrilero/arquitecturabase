@@ -148,12 +148,16 @@ function WSServer(){
             
             socket.on("golpearBloquePregunta", function(datos){
                 // Reenviar qué bloque de pregunta fue golpeado a los demás en la sala
-                socket.broadcast.to(datos.codigo).emit("bloquePreguntaGolpeado", {
+                // Incluir monedaId si viene en el payload para mantener sincronización
+                let payload = {
                     bloqueId: datos.bloqueId,
                     contenido: datos.contenido,
                     x: datos.x,
                     y: datos.y
-                });
+                };
+                if (typeof datos.monedaId !== 'undefined') payload.monedaId = datos.monedaId;
+
+                socket.broadcast.to(datos.codigo).emit("bloquePreguntaGolpeado", payload);
             });
             
             socket.on("actualizarVidas", function(datos){
@@ -161,6 +165,33 @@ function WSServer(){
                 socket.broadcast.to(datos.codigo).emit("vidasActualizadas", {
                     vidas: datos.vidas
                 });
+            });
+
+            socket.on("jugadorMuerto", function(datos){
+                // Reenviar evento de jugador muerto a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("jugadorMuerto", {
+                    codigo: datos.codigo
+                });
+            });
+            
+            socket.on("jugadorLlegoMeta", function(datos){
+                // Reenviar evento de jugador llegando a meta a los demás en la sala
+                // Incluir puntos si vienen en el payload
+                let payload = {
+                    codigo: datos.codigo
+                };
+                if (typeof datos.puntos !== 'undefined') payload.puntos = datos.puntos;
+                
+                socket.broadcast.to(datos.codigo).emit("jugadorLlegoMeta", payload);
+            });
+            
+            socket.on("nivelSeleccionado", function(datos){
+                // El creador seleccionó un nivel - almacenarlo en la partida
+                console.log("Nivel seleccionado para partida", datos.codigo + ":", datos.nivel);
+                let partida = sistema.partidas[datos.codigo];
+                if (partida) {
+                    partida.nivelSeleccionado = datos.nivel || 1;
+                }
             });
             
             socket.on("jugadorListo", function(datos){
@@ -184,9 +215,10 @@ function WSServer(){
                     // Verificar si todos los jugadores están listos
                     if (partida.jugadoresListos.length === partida.jugadores.length) {
                         console.log("¡Ambos jugadores listos! Iniciando juego para partida:", datos.codigo);
-                        // Emitir a TODOS en la sala (incluyendo el que envió)
+                        // Emitir a TODOS en la sala (incluyendo el que envió) con el nivel seleccionado
                         io.to(datos.codigo).emit("iniciarJuegoAhora", {
-                            codigo: datos.codigo
+                            codigo: datos.codigo,
+                            nivel: partida.nivelSeleccionado || 1
                         });
                         // Resetear el estado de listos para futuros usos
                         partida.jugadoresListos = [];

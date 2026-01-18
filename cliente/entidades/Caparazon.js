@@ -15,23 +15,17 @@ class Caparazon {
     constructor(scene, x, y, id, spriteExistente = null) {
         this.scene = scene;
         this.id = id;
-        
-        // Usar sprite existente o crear uno nuevo
-        if (spriteExistente) {
-            this.sprite = spriteExistente;
-            // Cambiar apariencia a caparazón
-            this.sprite.displayHeight = 28;
-            this.sprite.setFillStyle(0x006600); // Verde oscuro
-            // Limpiar la velocidad del sprite anterior
-            this.sprite.body.setVelocityX(0);
-        } else {
-            // Crear nuevo sprite para caparazón
-            this.sprite = scene.add.rectangle(x, y, 32, 28, 0x006600);
-            scene.physics.add.existing(this.sprite);
-            this.sprite.body.setCollideWorldBounds(true);
-            this.sprite.body.setBounce(0.3, 0);
-            this.sprite.body.setImmovable(false);
+        // Siempre crear un sprite nuevo para el caparazón usando la textura 'snail_shell'
+        // Si hay un sprite existente (Koopa), destrúyelo y crear uno nuevo en la misma posición
+        try { if (spriteExistente && spriteExistente.sprite) spriteExistente = spriteExistente.sprite; } catch(e){}
+        if (spriteExistente && spriteExistente.destroy) {
+            try { spriteExistente.destroy(); } catch(e){}
         }
+        this.sprite = scene.physics.add.sprite(x, y, 'snail_shell');
+        this.sprite.setDisplaySize(34, 24);
+        this.sprite.body.setCollideWorldBounds(true);
+        this.sprite.body.setBounce(0.3, 0);
+        this.sprite.body.setImmovable(false);
         
         // Propiedades de movimiento
         this.velocidad = 0; // 0 = quieto, ±400 = en movimiento

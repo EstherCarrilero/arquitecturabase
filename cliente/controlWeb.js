@@ -438,11 +438,35 @@ function ControlWeb(){
         $("#cardsPartidas").hide();
         $("#estadoPartidaActual").show();
         
+        // Determinar si este usuario es el creador
+        let nick = $.cookie("nick");
+        let esCreador = ws.esCreadorPartida || false; // Flag que se debe setear al crear partida
+        
+        let selectorNivel = '';
+        if (esCreador) {
+            selectorNivel = `
+                <div class="mb-3">
+                    <h5>Selecciona el nivel:</h5>
+                    <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
+                        <label class="btn btn-outline-success active flex-fill">
+                            <input type="radio" name="nivelOptions" id="nivel1" value="1" checked> Nivel 1 (Fácil)
+                        </label>
+                        <label class="btn btn-outline-danger flex-fill">
+                            <input type="radio" name="nivelOptions" id="nivel2" value="2"> Nivel 2 (Difícil)
+                        </label>
+                    </div>
+                    <small class="text-muted d-block mt-2">Nivel 1: Pocos enemigos, más champiñones<br>
+                    Nivel 2: Más enemigos, menos champiñones</small>
+                </div>
+            `;
+        }
+        
         $("#estadoPartida").html(`
             <div class="alert alert-success text-center">
                 <h4><i class="fas fa-check-circle"></i> ¡Partida completa!</h4>
                 <p class="mb-2">Código: <strong>${codigo}</strong></p>
                 <p class="mb-3">¡Ambos jugadores conectados!</p>
+                ${selectorNivel}
                 <button id="btnIniciarJuego" class="btn btn-primary btn-lg">
                     🎮 Iniciar Juego
                 </button>
@@ -458,6 +482,15 @@ function ControlWeb(){
         // Evento para indicar que este jugador está listo
         $("#btnIniciarJuego").off("click").on("click", function() {
             console.log("Jugador listo para iniciar");
+            
+            // Si es creador, enviar nivel seleccionado
+            let nivelSeleccionado = 1;
+            if (esCreador) {
+                nivelSeleccionado = parseInt($('input[name="nivelOptions"]:checked').val()) || 1;
+                console.log("Creador seleccionó nivel:", nivelSeleccionado);
+                ws.enviarNivelSeleccionado(codigo, nivelSeleccionado);
+            }
+            
             // Enviar señal de que este jugador está listo
             ws.jugadorListo(codigo);
             // Deshabilitar botón y mostrar mensaje de espera

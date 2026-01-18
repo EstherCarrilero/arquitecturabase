@@ -11,20 +11,21 @@ class Koopa {
         this.scene = scene;
         this.id = id;
         
-        // Crear sprite principal del Koopa (verde)
-        this.sprite = scene.add.rectangle(x, y, 32, 40, 0x00AA00);
-        scene.physics.add.existing(this.sprite);
+        // Crear sprite principal del Koopa usando imágenes (snail frames)
+        this.sprite = scene.physics.add.sprite(x, y, 'snail_rest');
+        this.sprite.setDisplaySize(40, 32);
         this.sprite.body.setCollideWorldBounds(true);
         this.sprite.body.setBounce(0.3, 0);
-            this.sprite.body.setImmovable(true);
-        
-        // Crear cabeza amarilla (característica visual del Koopa)
-        this.cabeza = scene.add.circle(x, y - 15, 8, 0xFFFF00);
+        this.sprite.body.setImmovable(false);
+        // Cabeza visual ya no necesaria (está en la imagen)
+        this.cabeza = null;
         
         // Propiedades de movimiento
         this.direccion = -1; // -1 = izquierda, 1 = derecha
         this.velocidad = 60;
         this.sprite.body.setVelocityX(this.direccion * this.velocidad);
+        // Reproducir animación inicial
+        try { if (this.sprite.anims) this.sprite.play('koopa-rest'); } catch(e){}
         
         // Estado
         this.activo = true;
@@ -77,13 +78,16 @@ class Koopa {
         if (Math.abs(this.sprite.body.velocity.x) < 55) {
             this.sprite.body.setVelocityX(this.direccion * this.velocidad);
         }
-        
-        // Actualizar posición de la cabeza
-        if (this.cabeza) {
-            this.cabeza.x = this.sprite.x;
-            this.cabeza.y = this.sprite.y - 15;
-            this.cabeza.visible = true;
-        }
+
+        // Animaciones: caminar cuando se mueve, descansar cuando parado
+        try {
+            let vx = this.sprite.body.velocity.x || 0;
+            if (Math.abs(vx) > 10) {
+                if (this.sprite.anims) this.sprite.play('koopa-walk', true);
+            } else {
+                if (this.sprite.anims) this.sprite.play('koopa-rest', true);
+            }
+        } catch (e) {}
     }
     
     /**
@@ -91,24 +95,11 @@ class Koopa {
      * @returns {Caparazon} El nuevo objeto Caparazon
      */
     convertirACaparazon() {
-        // Ocultar cabeza
-        if (this.cabeza) {
-            this.cabeza.visible = false;
-            this.cabeza.destroy();
-        }
-        
-        // Crear caparazón en la misma posición
-        let caparazon = new Caparazon(
-            this.scene,
-            this.sprite.x,
-            this.sprite.y,
-            this.id,
-            this.sprite
-        );
-        
-        // El sprite ahora pertenece al caparazón
+        // Crear caparazón en la misma posición usando sprite 'snail_shell'
+        let caparazon = Caparazon.crearDesdeKoopa(this.scene, this.sprite.x, this.sprite.y, this.id, this);
+        // Destruir el sprite del Koopa
+        try { if (this.sprite) this.sprite.destroy(); } catch(e){}
         this.activo = false;
-        
         return caparazon;
     }
     

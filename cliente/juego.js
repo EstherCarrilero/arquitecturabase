@@ -39,8 +39,22 @@ function Juego() {
     let puntuacionOtro = 0; // Monedas recogidas por el otro jugador
     let vidasJugador = 3; // Vidas del jugador principal - DEPRECADO (ahora en clase Jugador)
     let vidasOtro = 3; // Vidas del otro jugador
+    
+    // Sistema de puntos
+    let puntosJugador = 0; // Puntos del jugador principal
+    let puntosOtro = 0; // Puntos del otro jugador
+    let comboEnemigos = 0; // Contador de enemigos derrotados sin tocar suelo
+    let enElAire = false; // Flag para detectar si está en el aire
     let textoMiPuntuacion, textoOtroPuntuacion; // Textos en pantalla
     let textoMiVidas, textoOtraVidas; // Textos de vidas
+
+    // Helper para actualizar un sprite dígito del HUD (muestra sólo la cifra de las unidades)
+    function setHudDigit(sprite, number) {
+        const n = Math.max(0, Math.min(9, Math.floor(number) % 10));
+        if (sprite && typeof sprite.setTexture === 'function') {
+            sprite.setTexture('hud_character_' + n);
+        }
+    }
     let otroJugadorTarget = {x: 100, y: 450}; // Posición objetivo del otro jugador - DEPRECADO (ahora en clase OtroJugador)
     let ultimaPosicionRecibida = 0; // Timestamp de última actualización - DEPRECADO (ahora en clase OtroJugador)
     let ultimaPosicionOtro = {x: 100, y: 450}; // Última posición conocida para calcular velocidad - DEPRECADO (ahora en clase OtroJugador)
@@ -53,10 +67,25 @@ function Juego() {
     let jugadorRemoto;
     let listaKoopas = []; // Array de instancias Koopa
     let listaCaparazones = []; // Array de instancias Caparazon
+    
+    // Variables de meta
+    let bandera, mastilBandera;
+    let jugadorEnMeta = false;
+    let otroJugadorEnMeta = false;
+    
+    // Variable de nivel
+    let nivelActual = 1; // 1 = Fácil, 2 = Difícil
 
     this.iniciar = function(codigoPartida) {
         codigo = codigoPartida;
         console.log("Iniciando juego Phaser con código de partida:", codigo);
+        
+        // Verificar si hay un nivel temporal guardado
+        if (typeof window.nivelTemporal !== 'undefined') {
+            nivelActual = window.nivelTemporal;
+            delete window.nivelTemporal; // Limpiar temporal
+            console.log("Nivel configurado desde temporal:", nivelActual);
+        }
         
         // Configurar listeners de WebSocket ANTES de crear el juego
         configurarListenersWS();
@@ -73,28 +102,456 @@ function Juego() {
     };
 
     function preload() {
-        // Por ahora sin assets externos, usaremos formas geométricas
-        console.log("Phaser: preload");
+        console.log("Phaser: preload - cargando assets de jugador");
+        // Cargar imágenes separadas para el jugador (128x128 cada una)
+        this.load.image('player-front', 'cliente/assets/images/character_yellow_front.png');
+        this.load.image('player-idle', 'cliente/assets/images/character_yellow_idle.png');
+        this.load.image('player-walk-a', 'cliente/assets/images/character_yellow_walk_a.png');
+        this.load.image('player-walk-b', 'cliente/assets/images/character_yellow_walk_b.png');
+        this.load.image('player-jump', 'cliente/assets/images/character_yellow_jump.png');
+        this.load.image('player-hit', 'cliente/assets/images/character_yellow_hit.png');
+        // Cargar versión rosa para el jugador remoto
+        this.load.image('player-pink-front', 'cliente/assets/images/character_pink_front.png');
+        this.load.image('player-pink-idle', 'cliente/assets/images/character_pink_idle.png');
+        this.load.image('player-pink-walk-a', 'cliente/assets/images/character_pink_walk_a.png');
+        this.load.image('player-pink-walk-b', 'cliente/assets/images/character_pink_walk_b.png');
+        this.load.image('player-pink-jump', 'cliente/assets/images/character_pink_jump.png');
+        this.load.image('player-pink-hit', 'cliente/assets/images/character_pink_hit.png');
+        // Ground tiles
+        this.load.image('ground_top', 'cliente/assets/images/terrain_grass_block_top.png');
+        this.load.image('ground_top_left', 'cliente/assets/images/terrain_grass_block_top_left.png');
+        this.load.image('ground_top_right', 'cliente/assets/images/terrain_grass_block_top_right.png');
+        this.load.image('ground_center', 'cliente/assets/images/terrain_grass_block_center.png');
+        this.load.image('ground_left', 'cliente/assets/images/terrain_grass_block_left.png');
+        this.load.image('ground_right', 'cliente/assets/images/terrain_grass_block_right.png');
+        this.load.image('ground_bottom', 'cliente/assets/images/terrain_grass_block_bottom.png');
+        this.load.image('ground_bottom_left', 'cliente/assets/images/terrain_grass_block_bottom_left.png');
+        this.load.image('ground_bottom_right', 'cliente/assets/images/terrain_grass_block_bottom_right.png');
+        // Koopa / snail sprites
+        this.load.image('snail_shell', 'cliente/assets/images/snail_shell.png');
+        this.load.image('snail_rest', 'cliente/assets/images/snail_rest.png');
+        this.load.image('snail_walk_a', 'cliente/assets/images/snail_walk_a.png');
+        this.load.image('snail_walk_b', 'cliente/assets/images/snail_walk_b.png');
+        // Goomba / slime sprites
+        this.load.image('slime-flat', 'cliente/assets/images/slime_fire_flat.png');
+        this.load.image('slime-rest', 'cliente/assets/images/slime_fire_rest.png');
+        this.load.image('slime-walk-a', 'cliente/assets/images/slime_fire_walk_a.png');
+        this.load.image('slime-walk-b', 'cliente/assets/images/slime_fire_walk_b.png');
+        // Champiñón (star) sprite
+        this.load.image('star', 'cliente/assets/images/star.png');
+        // Coin sprites
+        this.load.image('coin_gold', 'cliente/assets/images/coin_gold.png');
+        this.load.image('coin_gold_side', 'cliente/assets/images/coin_gold_side.png');
+        // HUD sprites (player icons, coin icon, multiplier and digits)
+        this.load.image('hud_player_yellow', 'cliente/assets/images/hud_player_yellow.png');
+        this.load.image('hud_player_pink', 'cliente/assets/images/hud_player_pink.png');
+        this.load.image('hud_coin', 'cliente/assets/images/hud_coin.png');
+        this.load.image('hud_character_multiply', 'cliente/assets/images/hud_character_multiply.png');
+        this.load.image('hud_character_0', 'cliente/assets/images/hud_character_0.png');
+        this.load.image('hud_character_1', 'cliente/assets/images/hud_character_1.png');
+        this.load.image('hud_character_2', 'cliente/assets/images/hud_character_2.png');
+        this.load.image('hud_character_3', 'cliente/assets/images/hud_character_3.png');
+        this.load.image('hud_character_4', 'cliente/assets/images/hud_character_4.png');
+        this.load.image('hud_character_5', 'cliente/assets/images/hud_character_5.png');
+        this.load.image('hud_character_6', 'cliente/assets/images/hud_character_6.png');
+        this.load.image('hud_character_7', 'cliente/assets/images/hud_character_7.png');
+        this.load.image('hud_character_8', 'cliente/assets/images/hud_character_8.png');
+        this.load.image('hud_character_9', 'cliente/assets/images/hud_character_9.png');
+        // Background images
+        this.load.image('bg-solid-sky', 'cliente/assets/images/background_solid_sky.png');
+        this.load.image('bg-fade-trees', 'cliente/assets/images/background_fade_trees.png');
+        this.load.image('bg-solid-cloud', 'cliente/assets/images/background_solid_cloud.png');
+        this.load.image('bg-clouds', 'cliente/assets/images/background_clouds.png');
+        // Block sprites
+        this.load.image('bricks_brown', 'cliente/assets/images/bricks_brown.png');
+        this.load.image('block_planks', 'cliente/assets/images/block_planks.png');
+        this.load.image('block_exclamation', 'cliente/assets/images/block_exclamation.png');
+        this.load.image('block_exclamation_active', 'cliente/assets/images/block_exclamation_active.png');
     }
 
     function create() {
         console.log("Phaser: create");
         
+        // Cargar el nivel seleccionado (por defecto nivel 1)
+        cargarNivel.call(this, nivelActual);
+        // Animaciones del jugador (usando imágenes separadas)
+        this.anims.create({
+            key: 'player-walk',
+            frames: [ { key: 'player-walk-a' }, { key: 'player-walk-b' } ],
+            frameRate: 8,
+            repeat: -1
+        });
+
+        // Idle/Front
+        this.anims.create({
+            key: 'player-idle',
+            frames: [ { key: 'player-front' }, { key: 'player-idle' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        // Jump (single frame)
+        this.anims.create({
+            key: 'player-jump',
+            frames: [ { key: 'player-jump' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        // Hit (single frame)
+        this.anims.create({
+            key: 'player-hit',
+            frames: [ { key: 'player-hit' } ],
+            frameRate: 1,
+            repeat: 0
+        });
+
+        // Animaciones para el jugador rosa (otro jugador)
+        this.anims.create({
+            key: 'player-pink-walk',
+            frames: [ { key: 'player-pink-walk-a' }, { key: 'player-pink-walk-b' } ],
+            frameRate: 8,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-pink-idle',
+            frames: [ { key: 'player-pink-front' }, { key: 'player-pink-idle' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-pink-jump',
+            frames: [ { key: 'player-pink-jump' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-pink-hit',
+            frames: [ { key: 'player-pink-hit' } ],
+            frameRate: 1,
+            repeat: 0
+        });
+
+        // Koopa/snail animations
+        this.anims.create({
+            key: 'koopa-walk',
+            frames: [ { key: 'snail_walk_a' }, { key: 'snail_walk_b' } ],
+            frameRate: 6,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'koopa-rest',
+            frames: [ { key: 'snail_rest' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'shell-idle',
+            frames: [ { key: 'snail_shell' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        // Goomba / slime animations
+        this.anims.create({
+            key: 'goomba-walk',
+            frames: [ { key: 'slime-walk-a' }, { key: 'slime-walk-b' } ],
+            frameRate: 6,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'goomba-rest',
+            frames: [ { key: 'slime-rest' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'goomba-flat',
+            frames: [ { key: 'slime-flat' } ],
+            frameRate: 1,
+            repeat: 0
+        });
+
+        // Controles
+        cursors = this.input.keyboard.createCursorKeys();
+
+        console.log("Juego creado correctamente");
+    }
+    
+    // Función para cargar un nivel específico
+    function cargarNivel(numero) {
+        console.log("Cargando nivel", numero);
+
+        // === NIVEL 1 PLATFORM BUILDERS ===
+        // createFirstFloorPlatform: top, top_right, right, center
+        function createFirstFloorPlatform(scene, group, startX, bottomY, width, height = 64) {
+            const tileW = 64;
+            const tileH = 64;
+            const cols = Math.max(1, Math.ceil(width / tileW));
+            const rows = Math.max(1, Math.ceil(height / tileH));
+            const topY = bottomY - height;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const px = startX + c * tileW + tileW / 2;
+                    const py = topY + r * tileH + tileH / 2;
+                    let key = 'ground_center';
+                    
+                    if (r === 0) {
+                        // Top row
+                        if (c === cols - 1) key = 'ground_top_right';
+                        else key = 'ground_top';
+                    } else if (c === cols - 1) {
+                        // Right edge (not top row)
+                        key = 'ground_right';
+                    }
+
+                    const tile = scene.add.image(px, py, key).setOrigin(0.5, 0.5);
+                    scene.physics.add.existing(tile, true);
+                    group.add(tile);
+                }
+            }
+        }
+
+        // createSecondFloorPlatform: top, top_left, top_right, left, right, center
+        function createSecondFloorPlatform(scene, group, startX, bottomY, width, height = 64) {
+            const tileW = 64;
+            const tileH = 64;
+            const cols = Math.max(1, Math.ceil(width / tileW));
+            const rows = Math.max(1, Math.ceil(height / tileH));
+            const topY = bottomY - height;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const px = startX + c * tileW + tileW / 2;
+                    const py = topY + r * tileH + tileH / 2;
+                    let key = 'ground_center';
+                    
+                    if (r === 0) {
+                        // Top row
+                        if (c === 0) key = 'ground_top_left';
+                        else if (c === cols - 1) key = 'ground_top_right';
+                        else key = 'ground_top';
+                    } else {
+                        // Not top row
+                        if (c === 0) key = 'ground_left';
+                        else if (c === cols - 1) key = 'ground_right';
+                        else key = 'ground_center';
+                    }
+
+                    const tile = scene.add.image(px, py, key).setOrigin(0.5, 0.5);
+                    scene.physics.add.existing(tile, true);
+                    group.add(tile);
+                }
+            }
+        }
+
+        // createThirdFloorPlatform: top, top_left, top_right, left, right, center (same as second)
+        function createThirdFloorPlatform(scene, group, startX, bottomY, width, height = 64) {
+            const tileW = 64;
+            const tileH = 64;
+            const cols = Math.max(1, Math.ceil(width / tileW));
+            const rows = Math.max(1, Math.ceil(height / tileH));
+            const topY = bottomY - height;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const px = startX + c * tileW + tileW / 2;
+                    const py = topY + r * tileH + tileH / 2;
+                    let key = 'ground_center';
+                    
+                    if (r === 0) {
+                        // Top row
+                        if (c === 0) key = 'ground_top_left';
+                        else if (c === cols - 1) key = 'ground_top_right';
+                        else key = 'ground_top';
+                    } else {
+                        // Not top row
+                        if (c === 0) key = 'ground_left';
+                        else if (c === cols - 1) key = 'ground_right';
+                        else key = 'ground_center';
+                    }
+
+                    const tile = scene.add.image(px, py, key).setOrigin(0.5, 0.5);
+                    scene.physics.add.existing(tile, true);
+                    group.add(tile);
+                }
+            }
+        }
+
+        // createFourthFloorPlatform: top, top_left, left, center (no right edge)
+        function createFourthFloorPlatform(scene, group, startX, bottomY, width, height = 64) {
+            const tileW = 64;
+            const tileH = 64;
+            const cols = Math.max(1, Math.ceil(width / tileW));
+            const rows = Math.max(1, Math.ceil(height / tileH));
+            const topY = bottomY - height;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const px = startX + c * tileW + tileW / 2;
+                    const py = topY + r * tileH + tileH / 2;
+                    let key = 'ground_center';
+                    
+                    if (r === 0) {
+                        // Top row
+                        if (c === 0) key = 'ground_top_left';
+                        else key = 'ground_top';
+                    } else {
+                        // Not top row
+                        if (c === 0) key = 'ground_left';
+                        else key = 'ground_center';
+                    }
+
+                    const tile = scene.add.image(px, py, key).setOrigin(0.5, 0.5);
+                    scene.physics.add.existing(tile, true);
+                    group.add(tile);
+                }
+            }
+        }
+
+        // Generic helper for nivel 2 (backward compatibility)
+        function createTiledPlatform(scene, group, centerX, centerY, width, height = 64) {
+            const tileW = 64;
+            const tileH = 64;
+            const cols = Math.max(1, Math.ceil(width / tileW));
+            const rows = Math.max(1, Math.ceil(height / tileH));
+            const totalWidth = cols * tileW;
+            let startX = centerX - totalWidth / 2 + tileW / 2;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const px = Math.round(startX + c * tileW);
+                    const topEdge = centerY - height / 2;
+                    const py = Math.round(topEdge + tileH / 2 + r * tileH);
+                    let key = 'ground_center';
+                    if (r === 0) {
+                        if (c === cols - 1) key = 'ground_top_right';
+                        else key = 'ground_top';
+                    } else {
+                        key = 'ground_center';
+                    }
+                    const tile = scene.add.image(px, py, key).setOrigin(0.5, 0.5);
+                    scene.physics.add.existing(tile, true);
+                    group.add(tile);
+                }
+            }
+        }
+        
         // === CONFIGURACIÓN DEL MUNDO Y CÁMARA ===
-        // Expandir el mundo del juego (nivel más grande)
-        this.physics.world.setBounds(0, 0, 2400, 600); // 3x más ancho
+        // Expandir el mundo del juego (tamaño por nivel)
+        const worldWidth = numero === 1 ? 4500 : 2400; // Nivel 1 más largo
+        this.physics.world.setBounds(0, 0, worldWidth, 600);
         
         // Configurar cámara
         camara = this.cameras.main;
-        camara.setBounds(0, 0, 2400, 600); // Límites de la cámara = límites del mundo
+        camara.setBounds(0, 0, worldWidth, 600); // Límites de la cámara = límites del mundo
+        
+        // === FONDO POR CAPAS (solo nivel 1) ===
+        if (numero === 1) {
+            // Usar las dimensiones reales de las imágenes para apilar columnas verticales.
+            const skyTex = this.textures.get('bg-solid-sky').getSourceImage();
+            const cloudsTex = this.textures.get('bg-clouds').getSourceImage();
+            const solidCloudTex = this.textures.get('bg-solid-cloud').getSourceImage();
+            const treesTex = this.textures.get('bg-fade-trees').getSourceImage();
+
+            const skyW = skyTex.width;
+            const skyH = skyTex.height;
+            const cloudsW = cloudsTex.width;
+            const cloudsH = cloudsTex.height;
+            const solidCloudW = solidCloudTex.width;
+            const solidCloudH = solidCloudTex.height;
+            const treesW = treesTex.width;
+            const treesH = treesTex.height;
+
+            // Para repetir columnas, usar el ancho máximo de las imágenes
+            const columnWidth = Math.max(skyW, cloudsW, solidCloudW, treesW);
+
+            // Profundidades: cielo más atrás, árboles más al frente
+            const depthSky = -100;
+            const depthClouds = -90;
+            const depthSolidCloud = -80;
+            const depthTrees = -70;
+
+            // Para cada columna X, apilar las imágenes desde Y=0 hacia abajo: sky -> clouds -> solid_cloud -> trees
+            for (let x = 0; x < worldWidth; x += columnWidth) {
+                let y = 0;
+
+                // Sky (parte superior de la columna)
+                let sky = this.add.image(x, y, 'bg-solid-sky').setOrigin(0, 0);
+                sky.setDepth(depthSky);
+                y += skyH;
+
+                // Clouds (debajo del sky)
+                let clouds = this.add.image(x, y, 'bg-clouds').setOrigin(0, 0);
+                clouds.setDepth(depthClouds);
+                y += cloudsH;
+
+                // Solid clouds (debajo de clouds)
+                let solidCloud = this.add.image(x, y, 'bg-solid-cloud').setOrigin(0, 0);
+                solidCloud.setDepth(depthSolidCloud);
+                y += solidCloudH;
+
+                // Fade trees (nivel del suelo)
+                let trees = this.add.image(x, y, 'bg-fade-trees').setOrigin(0, 0);
+                trees.setDepth(depthTrees);
+                // y += treesH; // normalmente no necesitamos seguir más abajo
+            }
+        }
         
         // === SUELO Y PLATAFORMAS ===
         platforms = this.physics.add.staticGroup();
         
-        // Suelo principal (marrón tipo Mario) - Extendido para todo el nivel
-        let suelo = this.add.rectangle(1200, 568, 2400, 64, 0x8B4513);
-        this.physics.add.existing(suelo, true);
-        platforms.add(suelo);
+        if (numero === 1) {
+            // NIVEL 1: Estructura escalonada de 4 plataformas
+            const groundHeight = 64;
+            const baseWidth = 1200; // Ancho de referencia para la primera plataforma
+            
+            // Primera plataforma (parte más larga, base izquierda)
+            createFirstFloorPlatform(this, platforms, 0, 600, baseWidth, groundHeight);
+            
+            // Segunda plataforma (más corta, con hueco antes)
+            const secondWidth = baseWidth * 0.6; // 60% de la primera
+            const secondStartX = baseWidth + 200; // Hueco de 200px
+            createSecondFloorPlatform(this, platforms, secondStartX, 600, secondWidth, groundHeight);
+            
+            // Tercera plataforma (igual de larga que la primera, con hueco antes)
+            const thirdStartX = secondStartX + secondWidth + 200; // Hueco de 200px
+            createThirdFloorPlatform(this, platforms, thirdStartX, 600, baseWidth, groundHeight);
+            
+            // Cuarta plataforma (2/3 de la primera, sin borde derecho)
+            const fourthWidth = baseWidth * 0.66; // 2/3 de la primera
+            const fourthStartX = thirdStartX + baseWidth + 100; // Hueco de 100px
+            createFourthFloorPlatform(this, platforms, fourthStartX, 600, fourthWidth, groundHeight);
+            
+        } else {
+            // NIVEL 2 (DIFÍCIL): Múltiples huecos mortales
+            let sueloNivel2 = [
+                {x: 400, width: 800},    // Inicio
+                // Hueco en x=800 (ancho 400)
+                {x: 1200, width: 400},   // Sección media corta
+                // Hueco en x=1400 (ancho 400)
+                {x: 1800, width: 400},   // Otra sección corta
+                // Hueco en x=2000 (ancho 200)
+                {x: 2200, width: 400}    // Final
+            ];
+            sueloNivel2.forEach(seccion => {
+                createTiledPlatform(this, platforms, seccion.x, 568, seccion.width, 64);
+            });
+            
+            // Plataformas sobre los huecos (más pequeñas y difíciles)
+            let plataformasPuenteNivel2 = [
+                {x: 1000, y: 450, width: 200},
+                {x: 1600, y: 420, width: 150},
+                {x: 2100, y: 480, width: 180}
+            ];
+            plataformasPuenteNivel2.forEach(plat => {
+                createTiledPlatform(this, platforms, plat.x, plat.y, plat.width, 32);
+            });
+        }
         
         // === BLOQUES FLOTANTES ===
         bloques = this.physics.add.staticGroup();
@@ -103,145 +560,164 @@ function Juego() {
         
         let bloqueIdCounter = 0;
         
-        // Zona inicial (0-800)
-        // Bloques rompibles (naranja oscuro)
-        for (let i = 0; i < 2; i++) {
-            let bloque = this.add.rectangle(80 + i*32, 400, 30, 30, 0xCC6600);
-            this.physics.add.existing(bloque, true);
-            bloque.tipo = 'rompible';
-            bloque.id = bloqueIdCounter++;
-            bloque.roto = false;
-            bloques.add(bloque);
-            bloquesRompibles.push(bloque);
+        if (numero === 1) {
+            // NIVEL 1 (FÁCIL): Bloques accesibles y bien distribuidos
+            
+            // Grupo 1: Bloques bajos con champiñón
+            for (let i = 0; i < 3; i++) {
+                const bObj = new BloqueRompible(this, 200 + i*32, 400, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+                bloquesRompibles.push(bloque);
+            }
+
+            const bpObj1 = new BloquePregunta(this, 296, 400, bloqueIdCounter++, 'champinon');
+            let bloquePregunta1 = bpObj1.getSprite();
+            bloques.add(bloquePregunta1);
+            bloquesPregunta.push(bloquePregunta1);
+            bloquePregunta1.simbolo = this.add.text(296, 400, '?', {
+                fontSize: '20px',
+                color: '#8B4513',
+                fontStyle: 'bold'
+            });
+            bloquePregunta1.simbolo.setOrigin(0.5, 0.5);
+            
+            // Grupo 2: Escalera de bloques
+            for (let i = 0; i < 5; i++) {
+                const bObj = new Bloque(this, 500 + i*32, 350 - i*30, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+            }
+            
+            // Grupo 3: Bloques con monedas
+            const bpObj2 = new BloquePregunta(this, 900, 320, bloqueIdCounter++, 'moneda');
+            let bloquePregunta2 = bpObj2.getSprite();
+            bloques.add(bloquePregunta2);
+            bloquesPregunta.push(bloquePregunta2);
+            bloquePregunta2.simbolo = this.add.text(900, 320, '?', {
+                fontSize: '20px',
+                color: '#8B4513',
+                fontStyle: 'bold'
+            });
+            bloquePregunta2.simbolo.setOrigin(0.5, 0.5);
+            
+            for (let i = 0; i < 2; i++) {
+                const bObj = new BloqueRompible(this, 932 + i*32, 320, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+                bloquesRompibles.push(bloque);
+            }
+            
+            // Grupo 4: Plataforma alta
+            for (let i = 0; i < 4; i++) {
+                const bObj = new Bloque(this, 1400 + i*32, 250, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+            }
+            
+            // Grupo 5: Bloques finales
+            const bpObj3 = new BloquePregunta(this, 1800, 350, bloqueIdCounter++, 'champinon');
+            let bloquePregunta3 = bpObj3.getSprite();
+            bloques.add(bloquePregunta3);
+            bloquesPregunta.push(bloquePregunta3);
+            bloquePregunta3.simbolo = this.add.text(1800, 350, '?', {
+                fontSize: '20px',
+                color: '#8B4513',
+                fontStyle: 'bold'
+            });
+            bloquePregunta3.simbolo.setOrigin(0.5, 0.5);
+            
+        } else {
+            // NIVEL 2 (DIFÍCIL): Bloques más dispersos y difíciles de alcanzar
+            
+            // Grupo 1: Bloques altos al inicio
+            for (let i = 0; i < 2; i++) {
+                const bObj = new BloqueRompible(this, 300 + i*32, 300, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+                bloquesRompibles.push(bloque);
+            }
+
+            const bpObj1 = new BloquePregunta(this, 364, 300, bloqueIdCounter++, 'moneda');
+            let bloquePregunta1 = bpObj1.getSprite();
+            bloques.add(bloquePregunta1);
+            bloquesPregunta.push(bloquePregunta1);
+            bloquePregunta1.simbolo = this.add.text(364, 300, '?', {
+                fontSize: '20px',
+                color: '#8B4513',
+                fontStyle: 'bold'
+            });
+            bloquePregunta1.simbolo.setOrigin(0.5, 0.5);
+            
+            // Grupo 2: Bloques sobre primer hueco
+            for (let i = 0; i < 3; i++) {
+                const bObj = new Bloque(this, 950 + i*32, 350, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+            }
+            
+            // Grupo 3: Trampa - bloques rompibles sobre el vacío
+            for (let i = 0; i < 3; i++) {
+                const bObj = new BloqueRompible(this, 1500 + i*32, 280, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+                bloquesRompibles.push(bloque);
+            }
+            
+            const bpObj2 = new BloquePregunta(this, 1596, 280, bloqueIdCounter++, 'champinon');
+            let bloquePregunta2 = bpObj2.getSprite();
+            bloques.add(bloquePregunta2);
+            bloquesPregunta.push(bloquePregunta2);
+            bloquePregunta2.simbolo = this.add.text(1596, 280, '?', {
+                fontSize: '20px',
+                color: '#8B4513',
+                fontStyle: 'bold'
+            });
+            bloquePregunta2.simbolo.setOrigin(0.5, 0.5);
+            
+            // Grupo 4: Plataforma alta y lejana
+            for (let i = 0; i < 5; i++) {
+                const bObj = new Bloque(this, 1900 + i*32, 220, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+            }
+            
+            // Grupo 5: Bloques de pregunta final
+            const bpObj3 = new BloquePregunta(this, 2100, 380, bloqueIdCounter++, 'moneda');
+            let bloquePregunta3 = bpObj3.getSprite();
+            bloques.add(bloquePregunta3);
+            bloquesPregunta.push(bloquePregunta3);
+            bloquePregunta3.simbolo = this.add.text(2100, 380, '?', {
+                fontSize: '20px',
+                color: '#8B4513',
+                fontStyle: 'bold'
+            });
+            bloquePregunta3.simbolo.setOrigin(0.5, 0.5);
         }
-        
-        // Bloque de pregunta (amarillo con símbolo ?)
-        let bloquePregunta1 = this.add.rectangle(144, 400, 30, 30, 0xFFD700);
-        this.physics.add.existing(bloquePregunta1, true);
-        bloquePregunta1.tipo = 'pregunta';
-        bloquePregunta1.id = bloqueIdCounter++;
-        bloquePregunta1.usado = false;
-        bloquePregunta1.contenido = 'champinon'; // o 'moneda'
-        bloques.add(bloquePregunta1);
-        bloquesPregunta.push(bloquePregunta1);
-        
-        // Símbolo ? en el bloque
-        bloquePregunta1.simbolo = this.add.text(144, 400, '?', {
-            fontSize: '20px',
-            color: '#8B4513',
-            fontStyle: 'bold'
-        });
-        bloquePregunta1.simbolo.setOrigin(0.5, 0.5);
-        
-        // Bloques rompibles
-        for (let i = 0; i < 2; i++) {
-            let bloque = this.add.rectangle(300 + i*32, 300, 30, 30, 0xCC6600);
-            this.physics.add.existing(bloque, true);
-            bloque.tipo = 'rompible';
-            bloque.id = bloqueIdCounter++;
-            bloque.roto = false;
-            bloques.add(bloque);
-            bloquesRompibles.push(bloque);
-        }
-        
-        // Bloque de pregunta con moneda
-        let bloquePregunta2 = this.add.rectangle(364, 300, 30, 30, 0xFFD700);
-        this.physics.add.existing(bloquePregunta2, true);
-        bloquePregunta2.tipo = 'pregunta';
-        bloquePregunta2.id = bloqueIdCounter++;
-        bloquePregunta2.usado = false;
-        bloquePregunta2.contenido = 'moneda';
-        bloques.add(bloquePregunta2);
-        bloquesPregunta.push(bloquePregunta2);
-        bloquePregunta2.simbolo = this.add.text(364, 300, '?', {
-            fontSize: '20px',
-            color: '#8B4513',
-            fontStyle: 'bold'
-        });
-        bloquePregunta2.simbolo.setOrigin(0.5, 0.5);
-        
-        // Otro bloque de pregunta
-        let bloquePregunta3 = this.add.rectangle(396, 300, 30, 30, 0xFFD700);
-        this.physics.add.existing(bloquePregunta3, true);
-        bloquePregunta3.tipo = 'pregunta';
-        bloquePregunta3.id = bloqueIdCounter++;
-        bloquePregunta3.usado = false;
-        bloquePregunta3.contenido = 'champinon';
-        bloques.add(bloquePregunta3);
-        bloquesPregunta.push(bloquePregunta3);
-        bloquePregunta3.simbolo = this.add.text(396, 300, '?', {
-            fontSize: '20px',
-            color: '#8B4513',
-            fontStyle: 'bold'
-        });
-        bloquePregunta3.simbolo.setOrigin(0.5, 0.5);
-        
-        // Bloques rompibles
-        for (let i = 0; i < 2; i++) {
-            let bloque = this.add.rectangle(500 + i*32, 250, 30, 30, 0xCC6600);
-            this.physics.add.existing(bloque, true);
-            bloque.tipo = 'rompible';
-            bloque.id = bloqueIdCounter++;
-            bloque.roto = false;
-            bloques.add(bloque);
-            bloquesRompibles.push(bloque);
-        }
-        
-        // Zona media (800-1600)
-        for (let i = 0; i < 5; i++) {
-            let bloque = this.add.rectangle(900 + i*32, 350, 30, 30, 0xFF8C00);
-            this.physics.add.existing(bloque, true);
-            bloques.add(bloque);
-        }
-        
-        for (let i = 0; i < 3; i++) {
-            let bloque = this.add.rectangle(1200 + i*32, 280, 30, 30, 0xFF8C00);
-            this.physics.add.existing(bloque, true);
-            bloques.add(bloque);
-        }
-        
-        for (let i = 0; i < 4; i++) {
-            let bloque = this.add.rectangle(1400 + i*32, 200, 30, 30, 0xFF8C00);
-            this.physics.add.existing(bloque, true);
-            bloques.add(bloque);
-        }
-        
-        // Zona final (1600-2400)
-        for (let i = 0; i < 6; i++) {
-            let bloque = this.add.rectangle(1700 + i*32, 320, 30, 30, 0xFF8C00);
-            this.physics.add.existing(bloque, true);
-            bloques.add(bloque);
-        }
-        
-        for (let i = 0; i < 3; i++) {
-            let bloque = this.add.rectangle(2000 + i*32, 250, 30, 30, 0xFF8C00);
-            this.physics.add.existing(bloque, true);
-            bloques.add(bloque);
-        }
-        
-        // Bloques superiores dispersos por todo el nivel
-        let posicionesBloques = [
-            {x:200,y:150}, {x:450,y:180}, {x:650,y:200}, {x:700,y:150},
-            {x:1000,y:180}, {x:1300,y:150}, {x:1600,y:200}, {x:1900,y:170}, {x:2200,y:150}
-        ];
-        posicionesBloques.forEach(pos => {
-            let bloque = this.add.rectangle(pos.x, pos.y, 30, 30, 0xFF8C00);
-            this.physics.add.existing(bloque, true);
-            bloques.add(bloque);
-        });
         
         // === TUBOS VERDES (estilo Mario) ===
         tubos = this.physics.add.staticGroup();
         
-        // Tubos distribuidos por el nivel
-        let datosTubos = [
-            {x: 150, baseH: 80, topY: 470},   // Inicio - pequeño
-            {x: 650, baseH: 160, topY: 390},  // Zona 1 - grande
-            {x: 1100, baseH: 120, topY: 430}, // Zona 2 - medio
-            {x: 1500, baseH: 100, topY: 450}, // Zona 3 - medio
-            {x: 1900, baseH: 140, topY: 410}, // Zona 4 - grande
-            {x: 2200, baseH: 80, topY: 470}   // Final - pequeño
-        ];
+        let datosTubos = [];
+        if (numero === 1) {
+            // NIVEL 1: Tubos más accesibles
+            datosTubos = [
+                {x: 250, baseH: 80, topY: 470},
+                {x: 700, baseH: 120, topY: 430},
+                {x: 1100, baseH: 100, topY: 450},
+                {x: 1650, baseH: 140, topY: 410},
+                {x: 2050, baseH: 80, topY: 470}
+            ];
+        } else {
+            // NIVEL 2: Tubos más altos y peligrosos
+            datosTubos = [
+                {x: 350, baseH: 160, topY: 390},
+                {x: 850, baseH: 140, topY: 410},
+                {x: 1250, baseH: 120, topY: 430},
+                {x: 1700, baseH: 180, topY: 370},
+                {x: 2000, baseH: 160, topY: 390}
+            ];
+        }
         
         datosTubos.forEach(tubo => {
             let baseY = 568 - tubo.baseH/2;
@@ -253,67 +729,25 @@ function Juego() {
             tubos.add(tuboTop);
         });
         
-        // === ESCALERAS (amarillas) ===
-        escaleras = this.physics.add.staticGroup();
-        
-        // Escaleras distribuidas por el nivel
-        let posicionesEscaleras = [750, 1300, 1850, 2300];
-        posicionesEscaleras.forEach(x => {
-            for (let i = 0; i < 4; i++) {
-                let escalon = this.add.rectangle(x + i*25, 536 - i*25, 25, 25, 0xDAA520);
-                this.physics.add.existing(escalon, true);
-                escaleras.add(escalon);
-            }
-        });
-        
-        // === MONEDAS (amarillo brillante) ===
-        monedas = [];
-        let monedaId = 0; // Contador para IDs únicos
-        
-        // Monedas distribuidas por todo el nivel
-        // Zona 1 (0-800)
-        monedas.push(...Moneda.crearLinea(this, 300, 270, 4, 32, monedaId));
-        monedaId += 4;
-        
-        // Zona 2 (800-1600)
-        monedas.push(...Moneda.crearLinea(this, 900, 320, 5, 32, monedaId));
-        monedaId += 5;
-        
-        monedas.push(...Moneda.crearLinea(this, 1200, 250, 3, 32, monedaId));
-        monedaId += 3;
-        
-        // Zona 3 (1600-2400)
-        monedas.push(...Moneda.crearLinea(this, 1700, 290, 6, 32, monedaId));
-        monedaId += 6;
-        
-        monedas.push(...Moneda.crearLinea(this, 2000, 220, 3, 32, monedaId));
-        monedaId += 3;
-        
-        // === ENEMIGOS GOOMBA (marrones) ===
-        goombas = this.physics.add.group();
-        
-        // Crear Goombas distribuidos por el nivel usando la clase
-        let posicionesGoombas = [
-            {x: 400, y: 500},
-            {x: 1400, y: 500},
-            {x: 2000, y: 500}
-        ];
-        
-        let goombasArray = Goomba.crearGoombas(this, posicionesGoombas);
-        goombasArray.forEach(goomba => {
-            goombas.add(goomba.getSprite());
-        });
-        
         // === PLANTAS PIRAÑA (rojas con verde) ===
         plantasPirana = [];
         
-        // Posiciones de tuberías que tendrán plantas (datos copiados de datosTubos)
-        // Seleccionamos tubos específicos: índices 1, 2, 4
-        let tubosConPlantas = [
-            {x: 650, baseH: 160, topY: 390},  // Zona 1 - grande
-            {x: 1100, baseH: 120, topY: 430}, // Zona 2 - medio
-            {x: 1900, baseH: 140, topY: 410}  // Zona 4 - grande
-        ];
+        let tubosConPlantas = [];
+        if (numero === 1) {
+            // NIVEL 1: Menos plantas
+            tubosConPlantas = [
+                datosTubos[1], // Segundo tubo
+                datosTubos[3]  // Cuarto tubo
+            ];
+        } else {
+            // NIVEL 2: Más plantas piraña
+            tubosConPlantas = [
+                datosTubos[0], // Primer tubo
+                datosTubos[2], // Tercer tubo
+                datosTubos[3], // Cuarto tubo
+                datosTubos[4]  // Quinto tubo
+            ];
+        }
         
         tubosConPlantas.forEach(tuboData => {
             // Crear la planta (cuerpo rojo con cabeza verde)
@@ -344,17 +778,101 @@ function Juego() {
             plantasPirana.push(planta);
         });
         
+        // === ESCALERAS (amarillas) ===
+        escaleras = this.physics.add.staticGroup();
+        
+        let posicionesEscaleras = [];
+        if (numero === 1) {
+            // NIVEL 1: Escaleras más frecuentes
+            posicionesEscaleras = [600, 1150, 1750, 2150];
+        } else {
+            // NIVEL 2: Menos escaleras
+            posicionesEscaleras = [650, 1450, 2050];
+        }
+        
+        posicionesEscaleras.forEach(x => {
+            for (let i = 0; i < 4; i++) {
+                let escalon = this.add.rectangle(x + i*25, 536 - i*25, 25, 25, 0xDAA520);
+                this.physics.add.existing(escalon, true);
+                escaleras.add(escalon);
+            }
+        });
+        
+        // === MONEDAS (amarillo brillante) ===
+        monedas = [];
+        let monedaId = 0;
+        
+        if (numero === 1) {
+            // NIVEL 1: Más monedas y más accesibles
+            monedas.push(...Moneda.crearLinea(this, 300, 360, 4, 32, monedaId));
+            monedaId += 4;
+            monedas.push(...Moneda.crearLinea(this, 800, 300, 5, 32, monedaId));
+            monedaId += 5;
+            monedas.push(...Moneda.crearLinea(this, 1350, 440, 6, 32, monedaId));
+            monedaId += 6;
+            monedas.push(...Moneda.crearLinea(this, 1800, 310, 4, 32, monedaId));
+            monedaId += 4;
+        } else {
+            // NIVEL 2: Menos monedas y más dispersas
+            monedas.push(...Moneda.crearLinea(this, 400, 250, 3, 32, monedaId));
+            monedaId += 3;
+            monedas.push(...Moneda.crearLinea(this, 1000, 310, 3, 32, monedaId));
+            monedaId += 3;
+            monedas.push(...Moneda.crearLinea(this, 1600, 380, 4, 32, monedaId));
+            monedaId += 4;
+            monedas.push(...Moneda.crearLinea(this, 2000, 180, 3, 32, monedaId));
+            monedaId += 3;
+        }
+        
+        // === ENEMIGOS GOOMBA (marrones) ===
+        goombas = this.physics.add.group();
+        
+        // Crear Goombas distribuidos por el nivel usando la clase
+        let posicionesGoombas = [];
+        if (numero === 1) {
+            // Nivel 1 (Fácil): pocos enemigos
+            posicionesGoombas = [
+                {x: 400, y: 500},
+                {x: 1400, y: 500}
+            ];
+        } else {
+            // Nivel 2 (Difícil): más enemigos
+            posicionesGoombas = [
+                {x: 400, y: 500},
+                {x: 800, y: 500},
+                {x: 1200, y: 500},
+                {x: 1600, y: 500},
+                {x: 2000, y: 500}
+            ];
+        }
+        
+        let goombasArray = Goomba.crearGoombas(this, posicionesGoombas);
+        goombasArray.forEach(goomba => {
+            goombas.add(goomba.getSprite());
+        });
+        
         // === ENEMIGOS KOOPA (tortugas verdes) ===
         koopas = this.physics.add.group();
         
         // Crear Koopas distribuidos por el nivel usando la clase
-        let posicionesKoopas = [
-            {x: 500, y: 500},
-            {x: 800, y: 500},
-            {x: 1100, y: 500},
-            {x: 1300, y: 500},
-            {x: 1750, y: 500}
-        ];
+        let posicionesKoopas = [];
+        if (numero === 1) {
+            // Nivel 1 (Fácil): pocos Koopas
+            posicionesKoopas = [
+                {x: 800, y: 500},
+                {x: 1500, y: 500}
+            ];
+        } else {
+            // Nivel 2 (Difícil): más Koopas
+            posicionesKoopas = [
+                {x: 500, y: 500},
+                {x: 800, y: 500},
+                {x: 1100, y: 500},
+                {x: 1300, y: 500},
+                {x: 1750, y: 500},
+                {x: 2100, y: 500}
+            ];
+        }
         
         listaKoopas = Koopa.crearKoopas(this, posicionesKoopas);
         listaKoopas.forEach(koopa => {
@@ -369,16 +887,46 @@ function Juego() {
         champinones = this.physics.add.group();
         
         // Crear champiñones en posiciones específicas (sobre plataformas) usando la clase
-        let posicionesChampi = [
-            {x: 300, y: 450},   // Cerca del inicio
-            {x: 900, y: 300},   // Sobre una plataforma media
-            {x: 1500, y: 450}   // Más adelante
-        ];
+        let posicionesChampi = [];
+        if (numero === 1) {
+            // Nivel 1 (Fácil): más champiñones
+            posicionesChampi = [
+                {x: 300, y: 450},   // Cerca del inicio
+                {x: 900, y: 300},   // Sobre una plataforma media
+                {x: 1200, y: 450},
+                {x: 1500, y: 450}
+            ];
+        } else {
+            // Nivel 2 (Difícil): menos champiñones
+            posicionesChampi = [
+                {x: 900, y: 300},   // Sobre una plataforma media
+                {x: 1800, y: 450}
+            ];
+        }
         
         let champinonesArray = Champinon.crearChampinones(this, posicionesChampi);
         champinonesArray.forEach(champinon => {
             champinones.add(champinon.getSprite());
         });
+
+        // === BANDERA DE META (al final del nivel) ===
+        let metaX = numero === 1 ? 4300 : 2300; // Nivel 1 termina alrededor de x=4300
+        let metaY = 568;
+        
+        // Mástil de la bandera (gris oscuro, alto)
+        mastilBandera = this.add.rectangle(metaX, metaY - 150, 8, 300, 0x666666);
+        
+        // Bandera roja en la parte superior
+        bandera = this.add.polygon(metaX + 25, metaY - 280, [
+            0, 0,    // Esquina superior izquierda
+            50, 15,  // Punta derecha
+            0, 30    // Esquina inferior izquierda
+        ], 0xff0000);
+        
+        // Zona de detección de meta (invisible)
+        let zonaMeta = this.add.rectangle(metaX, metaY - 100, 80, 400, 0x00ff00, 0);
+        this.physics.add.existing(zonaMeta, true);
+        zonaMeta.isMeta = true;
 
         // === JUGADORES ===
         // Crear jugador principal usando la clase Jugador
@@ -391,6 +939,9 @@ function Juego() {
         this.physics.add.collider(player, bloques);
         this.physics.add.collider(player, tubos);
         this.physics.add.collider(player, escaleras);
+        
+        // Overlap con la zona de meta
+        this.physics.add.overlap(player, zonaMeta, llegarAMeta, null, this);
         
         // Colisiones de Goombas con entorno
         this.physics.add.collider(goombas, platforms);
@@ -568,66 +1119,59 @@ function Juego() {
         this.physics.add.collider(player, otroJugador);
         
         // === INTERFAZ DE PUNTUACIÓN (estilo Mario Bros) ===
-        // Línea 1: Jugador 1 (Rojo)
-        // Indicador de color del jugador
-        let colorIndicadorRojo = this.add.circle(20, 20, 10, 0xff0000);
-        colorIndicadorRojo.setScrollFactor(0);
-        colorIndicadorRojo.setDepth(100);
-        
-        // Vidas del jugador rojo
-        textoMiVidas = this.add.text(40, 10, 'x3', {
-            fontSize: '20px',
-            fill: '#ffffff',
-            fontStyle: 'bold'
-        });
+        // Línea 1: Jugador 1 (amarillo) - usar sprites HUD
+
+        // Jugador principal icono (movido un poco a la izquierda)
+        let hudIconMi = this.add.image(36, 28, 'hud_player_yellow').setScale(0.6);
+        hudIconMi.setScrollFactor(0);
+        hudIconMi.setDepth(100);
+
+        // Multiplicador 'x' para vidas (más cerca del dígito)
+        let hudMiMultiply = this.add.image(68, 28, 'hud_character_multiply').setScale(0.6);
+        hudMiMultiply.setScrollFactor(0);
+        hudMiMultiply.setDepth(100);
+
+        // Dígito de vidas (inicialmente 3)
+        textoMiVidas = this.add.image(88, 28, 'hud_character_3').setScale(0.6);
         textoMiVidas.setScrollFactor(0);
         textoMiVidas.setDepth(100);
-        
-        // Monedas del jugador rojo
-        let iconoMonedaRojo = this.add.circle(95, 20, 8, 0xFFD700);
-        iconoMonedaRojo.setScrollFactor(0);
-        iconoMonedaRojo.setDepth(100);
-        
-        textoMiPuntuacion = this.add.text(110, 10, 'x0', {
-            fontSize: '20px',
-            fill: '#ffffff',
-            fontStyle: 'bold'
-        });
+
+        // Icono de moneda y dígito (inicialmente 0)
+        let hudCoinMi = this.add.image(152, 28, 'hud_coin').setScale(0.6);
+        hudCoinMi.setScrollFactor(0);
+        hudCoinMi.setDepth(100);
+
+        textoMiPuntuacion = this.add.image(180, 28, 'hud_character_0').setScale(0.6);
         textoMiPuntuacion.setScrollFactor(0);
         textoMiPuntuacion.setDepth(100);
-        
-        // Línea 2: Jugador 2 (Azul)
-        // Indicador de color del jugador
-        let colorIndicadorAzul = this.add.circle(20, 50, 10, 0x0000ff);
-        colorIndicadorAzul.setScrollFactor(0);
-        colorIndicadorAzul.setDepth(100);
-        
-        // Vidas del jugador azul
-        textoOtraVidas = this.add.text(40, 40, 'x3', {
-            fontSize: '20px',
-            fill: '#ffffff',
-            fontStyle: 'bold'
-        });
+
+        // Línea 2: Jugador 2 (rosa) - usar sprites HUD
+        let hudIconOtro = this.add.image(36, 70, 'hud_player_pink').setScale(0.6);
+        hudIconOtro.setScrollFactor(0);
+        hudIconOtro.setDepth(100);
+
+        let hudOtroMultiply = this.add.image(68, 70, 'hud_character_multiply').setScale(0.6);
+        hudOtroMultiply.setScrollFactor(0);
+        hudOtroMultiply.setDepth(100);
+
+        textoOtraVidas = this.add.image(88, 70, 'hud_character_3').setScale(0.6);
         textoOtraVidas.setScrollFactor(0);
         textoOtraVidas.setDepth(100);
-        
-        // Monedas del jugador azul
-        let iconoMonedaAzul = this.add.circle(95, 50, 8, 0xFFD700);
-        iconoMonedaAzul.setScrollFactor(0);
-        iconoMonedaAzul.setDepth(100);
-        
-        textoOtroPuntuacion = this.add.text(110, 40, 'x0', {
-            fontSize: '20px',
-            fill: '#ffffff',
-            fontStyle: 'bold'
-        });
+
+        let hudCoinOtro = this.add.image(152, 70, 'hud_coin').setScale(0.6);
+        hudCoinOtro.setScrollFactor(0);
+        hudCoinOtro.setDepth(100);
+
+        textoOtroPuntuacion = this.add.image(180, 70, 'hud_character_0').setScale(0.6);
         textoOtroPuntuacion.setScrollFactor(0);
         textoOtroPuntuacion.setDepth(100);
-
-        // Controles
-        cursors = this.input.keyboard.createCursorKeys();
-
-        console.log("Juego creado correctamente");
+        
+        // Aplicar configuración específica del nivel
+        if (numero === 1) {
+            console.log("Nivel 1 (Fácil) cargado");
+        } else if (numero === 2) {
+            console.log("Nivel 2 (Difícil) cargado");
+        }
     }
     
     // Configurar listeners de WebSocket (una sola vez)
@@ -642,7 +1186,19 @@ function Juego() {
         // Recibir posición del rival
         ws.socket.on("actualizacionJuego", function(datos) {
             if (jugadorRemoto) {
-                otroJugador.visible = true;
+                // Solo mostrar si el otro jugador no está marcado como muerto
+                try {
+                    if (typeof jugadorRemoto.esMuerto === 'function') {
+                        if (!jugadorRemoto.esMuerto()) jugadorRemoto.mostrar();
+                    } else {
+                        // Fallback: usar la propiedad sprite
+                        if (otroJugador && !otroJugador.muerto) otroJugador.visible = true;
+                    }
+                } catch (e) {
+                    // En caso de error, mantener comportamiento anterior
+                    otroJugador.visible = true;
+                }
+
                 // Actualizar posición objetivo usando la clase
                 jugadorRemoto.actualizarPosicion(datos.x, datos.y);
             }
@@ -653,7 +1209,7 @@ function Juego() {
             if (datos && datos.puntuacion !== undefined) {
                 puntuacionOtro = datos.puntuacion;
                 if (textoOtroPuntuacion) {
-                    textoOtroPuntuacion.setText('x' + puntuacionOtro);
+                    setHudDigit(textoOtroPuntuacion, puntuacionOtro);
                 }
             }
         });
@@ -721,6 +1277,31 @@ function Juego() {
                 }
             }
         });
+
+        // Recibir notificación de jugador muerto (ocultar al otro jugador)
+        ws.socket.on("jugadorMuerto", function(datos) {
+            console.log("Evento jugadorMuerto recibido:", datos);
+            if (datos && datos.codigo === codigo) {
+                if (jugadorRemoto) {
+                    try {
+                        // Preferir usar la API del objeto remoto si existe
+                        if (typeof jugadorRemoto.morir === 'function') {
+                            jugadorRemoto.morir();
+                        } else {
+                            // Ocultar y desactivar el sprite del otro jugador
+                            otroJugador.visible = false;
+                            if (otroJugador.body) {
+                                otroJugador.body.enable = false;
+                            }
+                            if (jugadorRemoto.setVisible) jugadorRemoto.setVisible(false);
+                        }
+                        console.log("Otro jugador ocultado por muerte remota");
+                    } catch (e) {
+                        console.warn('Error al ocultar otro jugador:', e);
+                    }
+                }
+            }
+        });
         
         // Recibir champiñones recogidos por el rival
         ws.socket.on("champinonRecogido", function(datos) {
@@ -750,7 +1331,15 @@ function Juego() {
             bloquesPregunta.forEach(bloque => {
                 if (bloque.id === datos.bloqueId && !bloque.usado) {
                     bloque.usado = true;
-                    bloque.setFillStyle(0x8B4513);
+                    try {
+                        if (typeof bloque.setTexture === 'function') {
+                            // Es un sprite: poner textura inactiva
+                            bloque.setTexture('block_exclamation');
+                        } else if (typeof bloque.setFillStyle === 'function') {
+                            // Es un rectángulo antiguo: cambiar color a marrón
+                            bloque.setFillStyle(0x8B4513);
+                        }
+                    } catch (e) {}
                     if (bloque.simbolo) {
                         bloque.simbolo.visible = false;
                     }
@@ -769,16 +1358,28 @@ function Juego() {
                         
                         console.log("Champiñón creado en la pantalla del otro jugador!");
                     } else if (datos.contenido === 'moneda') {
-                        // Crear moneda que sale del bloque
-                        let monedaNueva = game.scene.scenes[0].add.circle(datos.x, datos.y - 20, 8, 0xFFFF00);
-                        game.scene.scenes[0].physics.add.existing(monedaNueva);
-                        monedaNueva.body.setVelocityY(-250);
-                        monedaNueva.body.setGravityY(800);
-                        
-                        // Eliminar moneda después de animación
-                        setTimeout(() => {
-                            monedaNueva.destroy();
-                        }, 500);
+                        // Crear moneda usando la clase Moneda con el ID proporcionado
+                        try {
+                            let idNuevo = (typeof datos.monedaId !== 'undefined') ? datos.monedaId : (monedas.reduce((max, m) => Math.max(max, m.getId()), -1) + 1);
+                            let monedaNueva = new Moneda(game.scene.scenes[0], datos.x, datos.y - 20, idNuevo);
+                            monedas.push(monedaNueva);
+
+                            // Añadir física visual para el efecto de salida (opcional)
+                            try {
+                                game.scene.scenes[0].physics.add.existing(monedaNueva.getSprite());
+                                monedaNueva.getSprite().body.setVelocityY(-250);
+                                monedaNueva.getSprite().body.setGravityY(800);
+                            } catch (e) {
+                                // continuar sin física si falla
+                            }
+
+                            // Eliminar moneda después de animación (no incrementar puntuación local)
+                            setTimeout(() => {
+                                monedaNueva.destroy();
+                            }, 500);
+                        } catch (e) {
+                            console.warn('Error al crear moneda remota desde bloque:', e);
+                        }
                     }
                 }
             });
@@ -797,7 +1398,20 @@ function Juego() {
         ws.socket.on("vidasActualizadas", function(datos) {
             console.log("Vidas del otro jugador actualizadas:", datos.vidas);
             if (textoOtraVidas) {
-                textoOtraVidas.setText('x' + datos.vidas);
+                setHudDigit(textoOtraVidas, datos.vidas);
+            }
+        });
+        
+        // Recibir notificación de que el otro jugador llegó a la meta
+        ws.socket.on("jugadorLlegoMeta", function(datos) {
+            console.log("Otro jugador llegó a la meta:", datos);
+            otroJugadorEnMeta = true;
+            if (datos.puntos !== undefined) {
+                puntosOtro = datos.puntos;
+            }
+            // Si ambos han llegado, mostrar victoria
+            if (jugadorEnMeta && otroJugadorEnMeta) {
+                mostrarVictoria();
             }
         });
         
@@ -807,8 +1421,11 @@ function Juego() {
     function recogerMoneda(moneda) {
         moneda.recoger(); // Usa el método de la clase Moneda
         puntuacionJugador++;
-        textoMiPuntuacion.setText('x' + puntuacionJugador);
-        console.log("¡Moneda recogida! ID:", moneda.getId(), "Total:", puntuacionJugador);
+        setHudDigit(textoMiPuntuacion, puntuacionJugador);
+        
+        // Sumar 200 puntos por moneda
+        puntosJugador += 200;
+        console.log("¡Moneda recogida! ID:", moneda.getId(), "Total monedas:", puntuacionJugador, "Puntos:", puntosJugador);
         
         // Enviar actualización de puntuación al servidor
         ws.enviarPuntuacion({
@@ -876,6 +1493,14 @@ function Juego() {
             // Rebote del jugador (mismo impulso que al matar Goomba)
             jugador.body.setVelocityY(-450);
             reboteEnemigo = true; // Evitar limitación de velocidad
+            
+            // Incrementar combo y calcular puntos (solo si es Koopa caminando, no caparazón)
+            if (koopa) {
+                comboEnemigos++;
+                let puntosGanados = calcularPuntosCombo(comboEnemigos);
+                puntosJugador += puntosGanados;
+                console.log("Combo x" + comboEnemigos + " - Puntos ganados:", puntosGanados, "Total:", puntosJugador);
+            }
             
             if (koopa) {
                 // Koopa caminando → Convertir a caparazón quieto
@@ -1018,6 +1643,18 @@ function Juego() {
         return distanciaVertical < 10 && distanciaHorizontal < (jugador.displayWidth/2 + 20);
     }
     
+    // Función para calcular puntos según combo
+    function calcularPuntosCombo(combo) {
+        switch(combo) {
+            case 1: return 200;
+            case 2: return 400;
+            case 3: return 800;
+            case 4: return 1000;
+            case 5: return 2000;
+            default: return combo >= 6 ? 4000 : 0;
+        }
+    }
+    
     // Función para golpear un Goomba
     function golpearGoomba(jugador, goombaSprite) {
         if (!goombaSprite.goombaRef) return;
@@ -1042,6 +1679,12 @@ function Juego() {
             // Hacer que el jugador rebote PRIMERO
             jugador.body.setVelocityY(-450);
             reboteEnemigo = true; // Evitar limitación de velocidad
+            
+            // Incrementar combo y calcular puntos
+            comboEnemigos++;
+            let puntosGanados = calcularPuntosCombo(comboEnemigos);
+            puntosJugador += puntosGanados;
+            console.log("Combo x" + comboEnemigos + " - Puntos ganados:", puntosGanados, "Total:", puntosJugador);
             
             // Eliminar localmente
             eliminarGoomba(goomba.getId());
@@ -1070,8 +1713,8 @@ function Juego() {
         // Usar el método de la clase Jugador que ya maneja todo
         let esGameOver = jugadorPrincipal.perderVida();
         
-        // Actualizar texto de vidas en el HUD
-        textoMiVidas.setText('x' + jugadorPrincipal.getVidas());
+        // Actualizar HUD de vidas (sprite-dígito)
+        setHudDigit(textoMiVidas, jugadorPrincipal.getVidas());
         
         // Sincronizar cambio de tamaño con otro jugador
         if (eraGrande && !jugadorPrincipal.esGrande()) {
@@ -1141,7 +1784,16 @@ function Juego() {
         if (bloque.usado) return;
         
         bloque.usado = true;
-        bloque.setFillStyle(0x8B4513); // Cambiar a marrón (bloque usado)
+        // Cambiar visual: si es un rectángulo antiguo usar setFillStyle, si es un sprite usar textura 'active'
+        try {
+            if (typeof bloque.setFillStyle === 'function') {
+                // rectángulo antiguo: cambiar color a marrón
+                bloque.setFillStyle(0x8B4513);
+            } else if (typeof bloque.setTexture === 'function') {
+                // sprite: cambiar a la versión INACTIVA tras ser usado
+                bloque.setTexture('block_exclamation');
+            }
+        } catch (e) {}
         if (bloque.simbolo) {
             bloque.simbolo.visible = false;
         }
@@ -1157,20 +1809,26 @@ function Juego() {
         
         // Soltar contenido según tipo
         if (bloque.contenido === 'moneda') {
-            // Crear moneda que sale del bloque
-            let monedaNueva = game.scene.scenes[0].add.circle(bloque.x, bloque.y - 20, 8, 0xFFFF00);
-            game.scene.scenes[0].physics.add.existing(monedaNueva);
-            monedaNueva.body.setVelocityY(-250);
-            monedaNueva.body.setGravityY(800);
-            
-            // Recoger moneda después de animación
+            // Crear moneda usando la clase Moneda y asignar un ID único
+            let nuevoId = monedas.reduce((max, m) => Math.max(max, m.getId()), -1) + 1;
+            let monedaNueva = new Moneda(game.scene.scenes[0], bloque.x, bloque.y - 20, nuevoId);
+            monedas.push(monedaNueva);
+
+            // Añadir física visual para el efecto de salida (opcional)
+            try {
+                game.scene.scenes[0].physics.add.existing(monedaNueva.getSprite());
+                monedaNueva.getSprite().body.setVelocityY(-250);
+                monedaNueva.getSprite().body.setGravityY(800);
+            } catch (e) {
+                // continuar sin física si falla
+            }
+
+            // Recoger moneda después de animación (esto incrementa la puntuación local y notifica)
             setTimeout(() => {
-                puntuacionJugador++;
-                textoMiPuntuacion.setText('x' + puntuacionJugador);
-                monedaNueva.destroy();
+                recogerMoneda(monedaNueva);
                 console.log("Moneda del bloque recogida! Total:", puntuacionJugador);
             }, 500);
-            
+
         } else if (bloque.contenido === 'champinon') {
             // Crear champiñón que sale del bloque usando la clase
             let idNuevo = champinones.getChildren().length;
@@ -1186,13 +1844,18 @@ function Juego() {
         }
         
         // Sincronizar con otros jugadores
-        ws.enviarBloqueGolpeado({
+        let payload = {
             codigo: codigo,
             bloqueId: bloque.id,
             contenido: bloque.contenido,
             x: bloque.x,
             y: bloque.y
-        });
+        };
+        if (bloque.contenido === 'moneda') {
+            // Incluir el ID de la moneda creada para que el otro cliente la sincronice
+            payload.monedaId = monedas.length ? monedas[monedas.length - 1].getId() : undefined;
+        }
+        ws.enviarBloqueGolpeado(payload);
     }
     
     // Función para recoger champiñón
@@ -1203,6 +1866,9 @@ function Juego() {
         if (!champi.isActivo()) return;
         
         console.log("¡Champiñón recogido! Jugador crece.");
+        
+        // Sumar 1000 puntos por champiñón
+        puntosJugador += 1000;
         
         // Eliminar champiñón visualmente
         eliminarChampinon(champi.getId());
@@ -1233,14 +1899,423 @@ function Juego() {
         console.log("Estado jugador grande:", jugadorPrincipal.esGrande());
     }
     
+    // Función cuando el jugador llega a la meta
+    function llegarAMeta(jugador, zonaMeta) {
+        if (jugadorEnMeta || jugadorPrincipal.esMuerto()) return; // Ya está en meta o muerto
+        
+        jugadorEnMeta = true;
+        console.log("¡Jugador local llegó a la meta!");
+        
+        // Detectar altura al tocar la bandera y dar bonus
+        let alturaJugador = jugador.y;
+        let bonusAltura = 0;
+        let ganóVida = false;
+        
+            if (alturaJugador <= 300) {
+            // Punta del poste (arriba)
+            bonusAltura = 5000;
+            ganóVida = true;
+            jugadorPrincipal.vidas++; // Ganar una vida extra
+            if (textoMiVidas) setHudDigit(textoMiVidas, jugadorPrincipal.getVidas());
+            console.log("¡Bonus punta del poste! +5000 puntos y +1 vida");
+        } else if (alturaJugador <= 450) {
+            // Parte media
+            bonusAltura = 2000;
+            console.log("¡Bonus parte media! +2000 puntos");
+        } else {
+            // Parte inferior
+            bonusAltura = 400;
+            console.log("¡Bonus parte inferior! +400 puntos");
+        }
+        
+        puntosJugador += bonusAltura;
+        console.log("Puntos totales:", puntosJugador);
+        
+        // Animar deslizamiento por la bandera
+        animarDeslizamientoBandera(jugador);
+        
+        // Notificar al servidor con los puntos
+        ws.enviarJugadorLlegoMeta({ codigo: codigo, puntos: puntosJugador });
+        
+        // Si el otro jugador ya llegó, mostrar victoria
+        if (otroJugadorEnMeta) {
+            mostrarVictoria();
+        }
+    }
+    
+    // Función para animar el deslizamiento por la bandera
+    function animarDeslizamientoBandera(jugador) {
+        // Desactivar controles del jugador (si es el jugador local, usar la API de la instancia)
+        try {
+            if (jugadorPrincipal && jugador === jugadorPrincipal.getSprite() && typeof jugadorPrincipal.setControlsEnabled === 'function') {
+                jugadorPrincipal.setControlsEnabled(false);
+            } else {
+                if (jugador.body) {
+                    jugador.body.setVelocity(0, 0);
+                    jugador.body.setAllowGravity(false);
+                }
+            }
+        } catch (e) {
+            console.warn('Error al desactivar controles para animación de bandera:', e);
+        }
+        
+        // Posicionar al jugador en el mástil (usar la posición actual del mástil si existe)
+        let metaX = (typeof mastilBandera !== 'undefined' && mastilBandera) ? mastilBandera.x : (numero === 1 ? 4300 : 2300);
+        jugador.x = metaX;
+        
+        // Animar bajada suave por el mástil
+        let intervalo = setInterval(() => {
+            if (jugador.y < 520) {
+                jugador.y += 2;
+            } else {
+                clearInterval(intervalo);
+                // Al terminar, mover al jugador al lado derecho
+                jugador.x = metaX + 50;
+                try {
+                    if (jugadorPrincipal && jugador === jugadorPrincipal.getSprite() && typeof jugadorPrincipal.setControlsEnabled === 'function') {
+                        // Mantener controles deshabilitados hasta la victoria
+                    } else if (jugador.body) {
+                        jugador.body.setAllowGravity(true);
+                    }
+                } catch (e) {
+                    console.warn('Error al finalizar animación de bandera:', e);
+                }
+
+                console.log("Jugador deslizó por la bandera y espera al otro lado");
+            }
+        }, 20);
+    }
+    
+    // Función para mostrar pantalla de victoria
+    function mostrarVictoria() {
+        console.log("¡VICTORIA! Ambos jugadores llegaron a la meta");
+        
+        // Obtener la escena activa
+        let scene = game.scene.scenes[0];
+        if (!scene) return;
+
+        // Fondo semi-transparente que cubre toda la pantalla
+        let overlay = scene.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
+        overlay.setScrollFactor(0);
+        overlay.setDepth(1000);
+
+        // Panel central del modal
+        let modalBg = scene.add.rectangle(400, 300, 450, 280, 0x2c3e50);
+        modalBg.setScrollFactor(0);
+        modalBg.setDepth(1001);
+        modalBg.setStrokeStyle(4, 0xf39c12);
+
+        // Título "¡VICTORIA!"
+        let titulo = scene.add.text(400, 200, '¡VICTORIA!', {
+            fontSize: '56px',
+            fontStyle: 'bold',
+            fill: '#f39c12',
+            fontFamily: 'Arial'
+        });
+        titulo.setOrigin(0.5);
+        titulo.setScrollFactor(0);
+        titulo.setDepth(1002);
+
+        // Mensaje
+        let mensaje = scene.add.text(400, 260, 'Ambos jugadores han llegado a la meta', {
+            fontSize: '20px',
+            fill: '#ecf0f1',
+            fontFamily: 'Arial'
+        });
+        mensaje.setOrigin(0.5);
+        mensaje.setScrollFactor(0);
+        mensaje.setDepth(1002);
+        
+        // Determinar ganador
+        let ganador = '';
+        if (puntosJugador > puntosOtro) {
+            ganador = '¡Tú ganaste!';
+        } else if (puntosOtro > puntosJugador) {
+            ganador = '¡El otro jugador ganó!';
+        } else {
+            ganador = '¡Empate!';
+        }
+        
+        let textoGanador = scene.add.text(400, 295, ganador, {
+            fontSize: '22px',
+            fontStyle: 'bold',
+            fill: puntosJugador > puntosOtro ? '#2ecc71' : (puntosOtro > puntosJugador ? '#e74c3c' : '#f39c12'),
+            fontFamily: 'Arial'
+        });
+        textoGanador.setOrigin(0.5);
+        textoGanador.setScrollFactor(0);
+        textoGanador.setDepth(1002);
+        
+        // Puntuaciones
+        let textoPuntosJugador = scene.add.text(400, 330, `Tus puntos: ${puntosJugador}`, {
+            fontSize: '18px',
+            fill: '#3498db',
+            fontFamily: 'Arial'
+        });
+        textoPuntosJugador.setOrigin(0.5);
+        textoPuntosJugador.setScrollFactor(0);
+        textoPuntosJugador.setDepth(1002);
+        
+        let textoPuntosOtro = scene.add.text(400, 355, `Puntos rival: ${puntosOtro}`, {
+            fontSize: '18px',
+            fill: '#9b59b6',
+            fontFamily: 'Arial'
+        });
+        textoPuntosOtro.setOrigin(0.5);
+        textoPuntosOtro.setScrollFactor(0);
+        textoPuntosOtro.setDepth(1002);
+
+        // Botón "Aceptar"
+        let botonBg = scene.add.rectangle(400, 380, 150, 50, 0x27ae60);
+        botonBg.setScrollFactor(0);
+        botonBg.setDepth(1002);
+        botonBg.setInteractive({ useHandCursor: true });
+
+        let botonTexto = scene.add.text(400, 380, 'ACEPTAR', {
+            fontSize: '24px',
+            fontStyle: 'bold',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        });
+        botonTexto.setOrigin(0.5);
+        botonTexto.setScrollFactor(0);
+        botonTexto.setDepth(1003);
+
+        // Efecto hover en el botón
+        botonBg.on('pointerover', function() {
+            botonBg.setFillStyle(0x2ecc71);
+        });
+        botonBg.on('pointerout', function() {
+            botonBg.setFillStyle(0x27ae60);
+        });
+
+        // Al hacer clic en "Aceptar", cerrar el modal
+        botonBg.on('pointerdown', function() {
+            overlay.destroy();
+            modalBg.destroy();
+            titulo.destroy();
+            mensaje.destroy();
+            textoGanador.destroy();
+            textoPuntosJugador.destroy();
+            textoPuntosOtro.destroy();
+            botonBg.destroy();
+            botonTexto.destroy();
+            console.log("Modal de victoria cerrado");
+        });
+    }
+
     // Función de Game Over
     function gameOverFunc() {
         console.log("Game Over!");
-        // TODO: Implementar pantalla de Game Over
+        // Ocultar jugador local y desactivar su cuerpo/hitbox para desaparecer localmente
+        try {
+            // Ocultar/Desactivar el sprite referenciado por la variable `player`
+            if (player) {
+                if (player.setVisible) player.setVisible(false);
+                else player.visible = false;
+
+                if (player.setActive) player.setActive(false);
+
+                // Desactivar el body (hitbox) de Arcade Physics si existe
+                if (player.body) {
+                    try {
+                        player.body.enable = false;
+                        // Evitar cualquier chequeo de colisión residual
+                        if (player.body.checkCollision) player.body.checkCollision.none = true;
+                        // Reducir el tamaño del body para garantizar que no colisione
+                        if (typeof player.body.setSize === 'function') {
+                            player.body.setSize(0, 0, false);
+                        }
+                    } catch (inner) {
+                        console.warn('Error al desactivar body del jugador:', inner);
+                    }
+                }
+            }
+
+            // También intentar ocultar/desactivar a través de la instancia Jugador si existe
+            if (typeof jugadorPrincipal !== 'undefined' && jugadorPrincipal) {
+                let spr = jugadorPrincipal.getSprite && jugadorPrincipal.getSprite();
+                if (spr && spr !== player) {
+                    if (spr.setVisible) spr.setVisible(false); else spr.visible = false;
+                    if (spr.setActive) spr.setActive(false);
+                    if (spr.body) {
+                        spr.body.enable = false;
+                        if (spr.body.checkCollision) spr.body.checkCollision.none = true;
+                        if (typeof spr.body.setSize === 'function') spr.body.setSize(0, 0, false);
+                    }
+                }
+
+                // Ocultar indicador si existe
+                if (jugadorPrincipal.getIndicador) {
+                    let ind = jugadorPrincipal.getIndicador();
+                    if (ind) {
+                        if (ind.setVisible) ind.setVisible(false); else ind.visible = false;
+                        if (ind.body) ind.body.enable = false;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Error al ocultar jugador local en gameOver:', e);
+        }
+
+        // Asegurarse de que la instancia Jugador cancele timers y se desactive completamente
+        try {
+            if (jugadorPrincipal && typeof jugadorPrincipal.morir === 'function') {
+                jugadorPrincipal.morir();
+            }
+        } catch (e) {
+            console.warn('Error al invocar jugadorPrincipal.morir():', e);
+        }
+
+        // Notificar al servidor/otro jugador que este jugador ha muerto
+        try {
+            ws.enviarJugadorMuerto({ codigo: codigo });
+        } catch (e) {
+            console.warn('Error al notificar muerte al servidor:', e);
+        }
+
+        // Cambiar la cámara para que siga al otro jugador
+        try {
+            if (camara && otroJugador) {
+                camara.stopFollow();
+                camara.startFollow(otroJugador, true, 0.1, 0.1);
+                console.log("Cámara ahora sigue al otro jugador");
+            }
+        } catch (e) {
+            console.warn('Error al cambiar seguimiento de cámara:', e);
+        }
+
+        // Mostrar modal de Game Over
+        mostrarModalGameOver();
+    }
+
+    function mostrarModalGameOver() {
+        // Obtener la escena activa
+        let scene = game.scene.scenes[0];
+        if (!scene) return;
+
+        // Fondo semi-transparente que cubre toda la pantalla
+        let overlay = scene.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
+        overlay.setScrollFactor(0);
+        overlay.setDepth(1000);
+
+        // Panel central del modal
+        let modalBg = scene.add.rectangle(400, 300, 400, 250, 0x2c3e50);
+        modalBg.setScrollFactor(0);
+        modalBg.setDepth(1001);
+        modalBg.setStrokeStyle(4, 0xe74c3c);
+
+        // Título "GAME OVER"
+        let titulo = scene.add.text(400, 220, 'GAME OVER', {
+            fontSize: '48px',
+            fontStyle: 'bold',
+            fill: '#e74c3c',
+            fontFamily: 'Arial'
+        });
+        titulo.setOrigin(0.5);
+        titulo.setScrollFactor(0);
+        titulo.setDepth(1002);
+
+        // Mensaje
+        let mensaje = scene.add.text(400, 280, 'Has perdido todas tus vidas', {
+            fontSize: '20px',
+            fill: '#ecf0f1',
+            fontFamily: 'Arial'
+        });
+        mensaje.setOrigin(0.5);
+        mensaje.setScrollFactor(0);
+        mensaje.setDepth(1002);
+
+        // Botón "Aceptar"
+        let botonBg = scene.add.rectangle(400, 350, 150, 50, 0x27ae60);
+        botonBg.setScrollFactor(0);
+        botonBg.setDepth(1002);
+        botonBg.setInteractive({ useHandCursor: true });
+
+        let botonTexto = scene.add.text(400, 350, 'ACEPTAR', {
+            fontSize: '24px',
+            fontStyle: 'bold',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        });
+        botonTexto.setOrigin(0.5);
+        botonTexto.setScrollFactor(0);
+        botonTexto.setDepth(1003);
+
+        // Efecto hover en el botón
+        botonBg.on('pointerover', function() {
+            botonBg.setFillStyle(0x2ecc71);
+        });
+        botonBg.on('pointerout', function() {
+            botonBg.setFillStyle(0x27ae60);
+        });
+
+        // Al hacer clic en "Aceptar", cerrar el modal
+        botonBg.on('pointerdown', function() {
+            overlay.destroy();
+            modalBg.destroy();
+            titulo.destroy();
+            mensaje.destroy();
+            botonBg.destroy();
+            botonTexto.destroy();
+            console.log("Modal de Game Over cerrado");
+        });
     }
 
     let lastUpdate = 0;
     function update(time) {
+        // === DETECCIÓN DE MUERTE POR CAÍDA AL VACÍO ===
+        if (player && !jugadorPrincipal.esMuerto()) {
+            // Si el jugador cae por debajo de la pantalla (y > 600), muere
+            if (player.y > 600) {
+                console.log("¡Jugador cayó al vacío!");
+
+                // Forzar pérdida de todas las vidas al caer: game over inmediato
+                let esGameOver = false;
+                if (jugadorPrincipal && typeof jugadorPrincipal.perderTodasVidas === 'function') {
+                    esGameOver = jugadorPrincipal.perderTodasVidas();
+                    if (textoMiVidas) setHudDigit(textoMiVidas, jugadorPrincipal.getVidas());
+                } else if (jugadorPrincipal && typeof jugadorPrincipal.perderVida === 'function') {
+                    // Fallback: si no existe el método, quitar todas las vidas manualmente
+                    while (jugadorPrincipal.getVidas() > 0) jugadorPrincipal.perderVida();
+                    esGameOver = true;
+                    if (textoMiVidas) setHudDigit(textoMiVidas, jugadorPrincipal.getVidas());
+                } else {
+                    // Fallback a variable legacy
+                    if (typeof vidasJugador !== 'undefined') {
+                        vidasJugador = 0;
+                        if (textoMiVidas) setHudDigit(textoMiVidas, vidasJugador);
+                        esGameOver = true;
+                    }
+                }
+
+                // Ejecutar muerte visual/estado
+                if (jugadorPrincipal && typeof jugadorPrincipal.morir === 'function') jugadorPrincipal.morir();
+
+                // Usaremos la función centralizada de Game Over (oculta jugador, notifica servidor y cambia cámara)
+                // Si no es Game Over (caso improbable aquí), se reviviría; pero en caídas forzamos Game Over.
+                if (!esGameOver) {
+                    setTimeout(() => {
+                        // Resetear posición del jugador
+                        player.x = 100;
+                        player.y = 400;
+                        if (player.body && typeof player.body.setVelocity === 'function') player.body.setVelocity(0, 0);
+
+                        // Revivir al jugador
+                        if (jugadorPrincipal && typeof jugadorPrincipal.revivir === 'function') jugadorPrincipal.revivir();
+                        if (player.setVisible) player.setVisible(true); else player.visible = true;
+                        if (playerIndicator) playerIndicator.visible = true;
+
+                        console.log("Jugador revivido tras caída al vacío");
+                    }, 2000);
+                } else {
+                    // Game Over: reutilizar la lógica existente
+                    
+                    gameOverFunc();
+                }
+            }
+        }
+        
         // === GESTIONAR INVULNERABILIDAD ===
         // No es necesario, ahora se gestiona en la clase Jugador
         
@@ -1319,7 +2394,7 @@ function Juego() {
         });
         
         // === DETECCIÓN MANUAL DE COLISIÓN CON GOOMBAS ===
-        if (!jugadorPrincipal.esInvulnerable()) {
+        if (!jugadorPrincipal.esInvulnerable() && !jugadorPrincipal.esMuerto()) {
             goombas.getChildren().forEach(goombaSprite => {
                 if (goombaSprite.goombaRef && goombaSprite.goombaRef.isActivo() && checkOverlap(player, goombaSprite)) {
                     golpearGoomba(player, goombaSprite);
@@ -1328,30 +2403,34 @@ function Juego() {
         }
         
         // === DETECCIÓN MANUAL DE COLISIÓN CON KOOPAS ===
-        koopas.getChildren().forEach(koopaSprite => {
-            // Verificar si es un Koopa o Caparazón activo
-            let entidad = koopaSprite.koopaRef || koopaSprite.caparazonRef;
-            if (entidad && entidad.isActivo()) {
-                // Para caparazones en movimiento, verificar overlap siempre
-                // Para otros casos, solo si hay overlap
-                let hayOverlap = checkOverlap(player, koopaSprite);
-                
-                if (hayOverlap) {
-                    golpearKoopa(player, koopaSprite);
+        if (!jugadorPrincipal.esMuerto()) {
+            koopas.getChildren().forEach(koopaSprite => {
+                // Verificar si es un Koopa o Caparazón activo
+                let entidad = koopaSprite.koopaRef || koopaSprite.caparazonRef;
+                if (entidad && entidad.isActivo()) {
+                    // Para caparazones en movimiento, verificar overlap siempre
+                    // Para otros casos, solo si hay overlap
+                    let hayOverlap = checkOverlap(player, koopaSprite);
+                    
+                    if (hayOverlap) {
+                        golpearKoopa(player, koopaSprite);
+                    }
                 }
-            }
-        });
+            });
+        }
         
         // === DETECCIÓN DE COLISIÓN CON CHAMPIÑONES ===
-        champinones.getChildren().forEach(champiSprite => {
-            if (champiSprite.champRef && champiSprite.champRef.isActivo() && checkOverlap(player, champiSprite)) {
-                recogerChampinon(champiSprite);
-            }
-        });
+        if (!jugadorPrincipal.esMuerto()) {
+            champinones.getChildren().forEach(champiSprite => {
+                if (champiSprite.champRef && champiSprite.champRef.isActivo() && checkOverlap(player, champiSprite)) {
+                    recogerChampinon(champiSprite);
+                }
+            });
+        }
         
         // === DETECCIÓN DE GOLPE A BLOQUES DESDE ABAJO ===
         // Verificar si el jugador está saltando y golpea un bloque desde abajo
-        if (player.body.velocity.y < 0) { // Subiendo (saltando)
+        if (!jugadorPrincipal.esMuerto() && player.body && player.body.velocity.y < 0) { // Subiendo (saltando)
             // Verificar bloques rompibles
             bloquesRompibles.forEach(bloque => {
                 if (!bloque.roto && checkOverlapVertical(player, bloque)) {
@@ -1484,7 +2563,7 @@ function Juego() {
         });
         
         // === DETECCIÓN DE COLISIÓN CON PLANTAS PIRAÑA ===
-        if (!jugadorPrincipal.esInvulnerable()) {
+        if (!jugadorPrincipal.esInvulnerable() && !jugadorPrincipal.esMuerto()) {
             plantasPirana.forEach(planta => {
                 if (planta.activa && planta.visible) {
                     // Verificar colisión con el cuerpo o la cabeza de la planta
@@ -1513,21 +2592,35 @@ function Juego() {
         let resultadoSalto = jugadorPrincipal.saltar(cursors, jumpPressed, reboteEnemigo);
         jumpPressed = resultadoSalto.jumpPressed;
         reboteEnemigo = resultadoSalto.reboteEnemigo;
+        
+        // Resetear combo si toca el suelo
+        if (!jugadorPrincipal.esMuerto() && player.body && player.body.touching.down) {
+            if (comboEnemigos > 0) {
+                console.log("Combo reseteado (tocó el suelo)");
+                comboEnemigos = 0;
+            }
+        }
 
         // === DETECCIÓN DE MONEDAS ===
         // Comprobar colisión con cada moneda activa
-        monedas.forEach(moneda => {
-            if (moneda.isActiva()) {
-                let monedaSprite = moneda.getSprite();
-                let distancia = Phaser.Math.Distance.Between(player.x, player.y, monedaSprite.x, monedaSprite.y);
-                if (distancia < 20) { // Radio de colisión (jugador 32px + moneda 8px)
-                    recogerMoneda(moneda);
+        if (!jugadorPrincipal.esMuerto()) {
+            monedas.forEach(moneda => {
+                if (moneda.isActiva()) {
+                    let monedaSprite = moneda.getSprite();
+                    let distancia = Phaser.Math.Distance.Between(player.x, player.y, monedaSprite.x, monedaSprite.y);
+                    // Calcular radio de colisión dinámico usando tamaños del jugador y la moneda
+                    const playerRadius = (player.displayWidth || 32) / 2;
+                    const coinRadius = (monedaSprite.displayWidth || 24) / 2;
+                    const collisionRadius = Math.max(20, playerRadius + coinRadius, 28); // mínimo razonable
+                    if (distancia < collisionRadius) {
+                        recogerMoneda(moneda);
+                    }
                 }
-            }
-        });
+            });
+        }
 
         // Enviar posición al servidor (throttle cada 20ms para sincronización precisa)
-        if (time - lastUpdate > 20) {
+        if (!jugadorPrincipal.esMuerto() && time - lastUpdate > 20) {
             let pos = jugadorPrincipal.getPosicion();
             ws.enviarPosicion({
                 codigo: codigo,

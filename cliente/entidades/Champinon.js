@@ -6,18 +6,18 @@ class Champinon {
         this.direccion = 1; // 1 derecha, -1 izquierda
         this.velocidad = 80;
         
-        // Crear sprite del champiñón (rectángulo rojo)
-        this.sprite = scene.add.rectangle(x, y, 28, 28, 0xFF0000);
-        scene.physics.add.existing(this.sprite);
+        // Crear sprite del champiñón usando la textura 'star'
+        this.sprite = scene.physics.add.sprite(x, y, 'star');
+        this.sprite.setDisplaySize(32, 32);
         this.sprite.body.setCollideWorldBounds(true);
         this.sprite.body.setBounce(0, 0);
         this.sprite.body.setVelocityX(this.velocidad);
-        
-        // Puntos blancos decorativos del champiñón
-        this.punto1 = scene.add.circle(x - 7, y - 7, 4, 0xFFFFFF);
-        this.punto2 = scene.add.circle(x + 7, y - 7, 4, 0xFFFFFF);
-        this.punto3 = scene.add.circle(x, y - 3, 3, 0xFFFFFF);
-        
+
+        // No usamos puntos decorativos cuando usamos sprite
+        this.punto1 = null;
+        this.punto2 = null;
+        this.punto3 = null;
+
         // Guardar referencia a la clase en el sprite para acceder desde colisiones
         this.sprite.champRef = this;
     }
@@ -37,10 +37,7 @@ class Champinon {
     actualizar() {
         if (!this.activo) {
             // Ocultar champiñón consumido
-            this.sprite.visible = false;
-            if (this.punto1) this.punto1.visible = false;
-            if (this.punto2) this.punto2.visible = false;
-            if (this.punto3) this.punto3.visible = false;
+            if (this.sprite) try { this.sprite.setVisible(false); } catch(e){}
             return;
         }
         
@@ -55,27 +52,12 @@ class Champinon {
             this.sprite.body.setVelocityX(this.direccion * this.velocidad);
         }
         
-        // Actualizar posición de los puntos decorativos
-        if (this.punto1) {
-            this.punto1.x = this.sprite.x - 7;
-            this.punto1.y = this.sprite.y - 7;
-        }
-        if (this.punto2) {
-            this.punto2.x = this.sprite.x + 7;
-            this.punto2.y = this.sprite.y - 7;
-        }
-        if (this.punto3) {
-            this.punto3.x = this.sprite.x;
-            this.punto3.y = this.sprite.y - 3;
-        }
+        // No hay decorativos que actualizar cuando usamos sprite
     }
     
     recoger() {
         this.activo = false;
-        this.sprite.visible = false;
-        if (this.punto1) this.punto1.visible = false;
-        if (this.punto2) this.punto2.visible = false;
-        if (this.punto3) this.punto3.visible = false;
+        if (this.sprite) try { this.sprite.setVisible(false); } catch(e){}
         console.log("Champiñón recogido (ID:", this.id, ")");
     }
     

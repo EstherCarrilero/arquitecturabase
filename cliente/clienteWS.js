@@ -1,5 +1,6 @@
 function ClienteWS(){ 
     this.socket=undefined; 
+    this.esCreadorPartida = false; // Flag para saber si es creador
     this.ini=function(){ 
         this.socket=io(); 
     }
@@ -110,6 +111,27 @@ function ClienteWS(){
             this.socket.emit("actualizarVidas", datos);
         }
     }
+
+    this.enviarJugadorMuerto = function(datos) {
+        // Notificar al servidor que el jugador ha muerto
+        if (datos && datos.codigo) {
+            this.socket.emit("jugadorMuerto", datos);
+        }
+    }
+    
+    this.enviarJugadorLlegoMeta = function(datos) {
+        // Notificar al servidor que el jugador llegó a la meta
+        if (datos && datos.codigo) {
+            this.socket.emit("jugadorLlegoMeta", datos);
+        }
+    }
+    
+    this.enviarNivelSeleccionado = function(codigo, nivel) {
+        // Enviar el nivel seleccionado por el creador
+        if (codigo && nivel) {
+            this.socket.emit("nivelSeleccionado", {codigo: codigo, nivel: nivel});
+        }
+    }
     
     this.jugadorListo=function(codigo){
         // Enviar señal de que el jugador está listo para comenzar
@@ -123,6 +145,7 @@ function ClienteWS(){
     this.socket.on("partidaCreada",function(datos){ 
         console.log("Partida creada con código:", datos.codigo); 
         ws.codigo=datos.codigo;
+        ws.esCreadorPartida = true; // Marcar como creador
         if (datos.codigo != -1) {
             cw.mostrarEsperandoRival(datos.codigo);
         } else {
@@ -159,7 +182,17 @@ function ClienteWS(){
     
     this.socket.on("iniciarJuegoAhora",function(datos){
         console.log("Ambos jugadores listos - Iniciando juego:", datos.codigo);
-        // Iniciar el juego de forma sincronizada
+        // Iniciar el juego de forma sincronizada con el nivel recibido
+        if (datos.nivel) {
+            console.log("Nivel a cargar:", datos.nivel);
+            // Guardar nivel para que Juego lo use
+            if (window.juego) {
+                window.juego.nivelActual = datos.nivel;
+            } else {
+                // Almacenar temporalmente para cuando se cree el juego
+                window.nivelTemporal = datos.nivel;
+            }
+        }
         cw.iniciarJuegoSincronizado(datos.codigo);
     });
     

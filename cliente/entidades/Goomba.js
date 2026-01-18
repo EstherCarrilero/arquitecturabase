@@ -6,12 +6,12 @@ class Goomba {
         this.direccion = -1; // -1 izquierda, 1 derecha
         this.velocidad = 50;
         
-        // Crear sprite del Goomba (rectángulo marrón)
-        this.sprite = scene.add.rectangle(x, y, 28, 28, 0x8B4513);
-        scene.physics.add.existing(this.sprite);
+        // Crear sprite del Goomba usando imágenes slime
+        this.sprite = scene.physics.add.sprite(x, y, 'slime-rest');
+        this.sprite.setDisplaySize(44, 34);
         this.sprite.body.setCollideWorldBounds(true);
         this.sprite.body.setBounce(0, 0);
-        this.sprite.body.setImmovable(true); // No se mueve al ser empujado
+        this.sprite.body.setImmovable(true);
         this.sprite.body.setVelocityX(this.direccion * this.velocidad);
         
         // Guardar referencia a la clase en el sprite para acceder desde colisiones
@@ -39,11 +39,21 @@ class Goomba {
             this.direccion *= -1; // Cambiar dirección
             this.sprite.body.setVelocityX(this.direccion * this.velocidad);
         }
-        
+
         // Mantener velocidad constante
         if (Math.abs(this.sprite.body.velocity.x) < 45) {
             this.sprite.body.setVelocityX(this.direccion * this.velocidad);
         }
+
+        // Animaciones: caminar cuando se mueve, descansar cuando esté parado
+        try {
+            let vx = this.sprite.body.velocity.x || 0;
+            if (Math.abs(vx) > 10) {
+                if (this.sprite.anims) this.sprite.play('goomba-walk', true);
+            } else {
+                if (this.sprite.anims) this.sprite.play('goomba-rest', true);
+            }
+        } catch (e) {}
     }
     
     eliminar() {
@@ -56,11 +66,12 @@ class Goomba {
         
         // Detener movimiento
         this.sprite.body.setVelocity(0, 0);
-        
-        // Oscurecer y aplastar visualmente
-        this.sprite.setFillStyle(0x555555);
-        this.sprite.displayHeight = 10;
-        
+        // Cambiar textura a 'flat' cuando es pisado
+        try {
+            if (this.sprite.setTexture) this.sprite.setTexture('slime-flat');
+            this.sprite.setDisplaySize(46, 14);
+        } catch (e) {}
+
         // Eliminar después de animación
         setTimeout(() => {
             if (this.sprite && this.sprite.active) {
