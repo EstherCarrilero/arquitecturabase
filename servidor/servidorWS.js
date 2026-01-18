@@ -86,6 +86,113 @@ function WSServer(){
                 socket.leave(datos.codigo);
                 console.log("Socket salió de la sala:", datos.codigo);
             });
+            
+            socket.on("posicionJugador", function(datos){
+                // Reenviar la posición del jugador a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("actualizacionJuego", {
+                    x: datos.x,
+                    y: datos.y
+                });
+            });
+            
+            socket.on("puntuacionJugador", function(datos){
+                // Reenviar la puntuación del jugador a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("actualizacionPuntuacion", {
+                    puntuacion: datos.puntuacion
+                });
+            });
+            
+            socket.on("recogerMoneda", function(datos){
+                // Reenviar qué moneda fue recogida a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("monedaRecogida", {
+                    monedaId: datos.monedaId
+                });
+            });
+            
+            socket.on("eliminarGoomba", function(datos){
+                // Reenviar qué Goomba fue eliminado a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("goombaEliminado", {
+                    goombaId: datos.goombaId
+                });
+            });
+            
+            socket.on("cambiarEstadoKoopa", function(datos){
+                // Reenviar cambio de estado de Koopa a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("koopaEstadoCambiado", {
+                    koopaId: datos.koopaId,
+                    estado: datos.estado,
+                    velocidad: datos.velocidad
+                });
+            });
+            
+            socket.on("cambiarEstadoGrande", function(datos){
+                // Reenviar cambio de estado grande/pequeño a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("estadoGrandeCambiado", {
+                    grande: datos.grande
+                });
+            });
+            
+            socket.on("recogerChampinon", function(datos){
+                // Reenviar qué champiñón fue recogido a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("champinonRecogido", {
+                    champinonId: datos.champinonId
+                });
+            });
+            
+            socket.on("romperBloque", function(datos){
+                // Reenviar qué bloque fue roto a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("bloqueRoto", {
+                    bloqueId: datos.bloqueId
+                });
+            });
+            
+            socket.on("golpearBloquePregunta", function(datos){
+                // Reenviar qué bloque de pregunta fue golpeado a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("bloquePreguntaGolpeado", {
+                    bloqueId: datos.bloqueId,
+                    contenido: datos.contenido,
+                    x: datos.x,
+                    y: datos.y
+                });
+            });
+            
+            socket.on("actualizarVidas", function(datos){
+                // Reenviar las vidas del jugador a los demás en la sala
+                socket.broadcast.to(datos.codigo).emit("vidasActualizadas", {
+                    vidas: datos.vidas
+                });
+            });
+            
+            socket.on("jugadorListo", function(datos){
+                console.log("Jugador listo recibido - Email:", datos.email, "Código:", datos.codigo);
+                
+                // Obtener la partida del sistema
+                let partida = sistema.partidas[datos.codigo];
+                
+                if (partida) {
+                    // Inicializar el objeto de estados listos si no existe
+                    if (!partida.jugadoresListos) {
+                        partida.jugadoresListos = [];
+                    }
+                    
+                    // Marcar este jugador como listo (si no está ya)
+                    if (!partida.jugadoresListos.includes(datos.email)) {
+                        partida.jugadoresListos.push(datos.email);
+                        console.log("Jugadores listos en partida", datos.codigo + ":", partida.jugadoresListos.length, "de", partida.jugadores.length);
+                    }
+                    
+                    // Verificar si todos los jugadores están listos
+                    if (partida.jugadoresListos.length === partida.jugadores.length) {
+                        console.log("¡Ambos jugadores listos! Iniciando juego para partida:", datos.codigo);
+                        // Emitir a TODOS en la sala (incluyendo el que envió)
+                        io.to(datos.codigo).emit("iniciarJuegoAhora", {
+                            codigo: datos.codigo
+                        });
+                        // Resetear el estado de listos para futuros usos
+                        partida.jugadoresListos = [];
+                    }
+                }
+            });
         }); 
     } 
 

@@ -40,6 +40,85 @@ function ClienteWS(){
             this.socket.emit("abandonarPartida",{"email":email,"codigo":codigo});
         }
     }
+    
+    this.enviarPosicion=function(datos){
+        // Enviar posición del jugador al servidor
+        if (datos && datos.codigo) {
+            this.socket.emit("posicionJugador", datos);
+        }
+    }
+    
+    this.enviarPuntuacion=function(datos){
+        // Enviar puntuación del jugador al servidor
+        if (datos && datos.codigo) {
+            this.socket.emit("puntuacionJugador", datos);
+        }
+    }
+    
+    this.enviarMonedaRecogida=function(datos){
+        // Enviar ID de moneda recogida al servidor
+        if (datos && datos.codigo && datos.monedaId !== undefined) {
+            this.socket.emit("recogerMoneda", datos);
+        }
+    }
+    
+    this.enviarGoombaEliminado=function(datos){
+        // Enviar ID de Goomba eliminado al servidor
+        if (datos && datos.codigo && datos.goombaId !== undefined) {
+            this.socket.emit("eliminarGoomba", datos);
+        }
+    }
+    
+    this.enviarKoopaEstado=function(datos){
+        // Enviar cambio de estado de Koopa al servidor
+        if (datos && datos.codigo && datos.koopaId !== undefined) {
+            this.socket.emit("cambiarEstadoKoopa", datos);
+        }
+    }
+    
+    this.enviarEstadoGrande=function(datos){
+        // Enviar estado grande/pequeño del jugador al servidor
+        if (datos && datos.codigo !== undefined && datos.grande !== undefined) {
+            this.socket.emit("cambiarEstadoGrande", datos);
+        }
+    }
+    
+    this.enviarChampinonRecogido=function(datos){
+        // Enviar ID de champiñón recogido al servidor
+        if (datos && datos.codigo && datos.champinonId !== undefined) {
+            this.socket.emit("recogerChampinon", datos);
+        }
+    }
+    
+    this.enviarBloqueRoto=function(datos){
+        // Enviar ID de bloque roto al servidor
+        if (datos && datos.codigo && datos.bloqueId !== undefined) {
+            this.socket.emit("romperBloque", datos);
+        }
+    }
+    
+    this.enviarBloqueGolpeado=function(datos){
+        // Enviar ID de bloque de pregunta golpeado al servidor
+        if (datos && datos.codigo && datos.bloqueId !== undefined) {
+            this.socket.emit("golpearBloquePregunta", datos);
+        }
+    }
+    
+    this.enviarVidas=function(datos){
+        // Enviar vidas del jugador al servidor
+        if (datos && datos.codigo !== undefined && datos.vidas !== undefined) {
+            this.socket.emit("actualizarVidas", datos);
+        }
+    }
+    
+    this.jugadorListo=function(codigo){
+        // Enviar señal de que el jugador está listo para comenzar
+        let email = $.cookie("nick");
+        if (email && codigo) {
+            console.log("Enviando señal de jugador listo:", codigo);
+            this.socket.emit("jugadorListo", {email: email, codigo: codigo});
+        }
+    }
 
     this.socket.on("partidaCreada",function(datos){ 
         console.log("Partida creada con código:", datos.codigo); 
@@ -76,6 +155,20 @@ function ClienteWS(){
         console.log("Un jugador ha abandonado - Código:", datos.codigo);
         // Volver a mostrar "Esperando rival..."
         cw.mostrarEsperandoRival(datos.codigo);
+    });
+    
+    this.socket.on("iniciarJuegoAhora",function(datos){
+        console.log("Ambos jugadores listos - Iniciando juego:", datos.codigo);
+        // Iniciar el juego de forma sincronizada
+        cw.iniciarJuegoSincronizado(datos.codigo);
+    });
+    
+    this.socket.on("estadoGrandeCambiado",function(datos){
+        console.log("Estado grande del otro jugador cambiado:", datos.grande);
+        // Actualizar el estado del otro jugador en el juego
+        if (window.juego && window.juego.actualizarOtroJugadorGrande) {
+            window.juego.actualizarOtroJugadorGrande(datos.grande);
+        }
     });
     
     this.socket.on("partidaEliminada",function(datos){

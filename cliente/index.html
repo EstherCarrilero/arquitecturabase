@@ -18,6 +18,8 @@
         <script src="https://accounts.google.com/gsi/client" async defer></script> 
         <!-- Socket.io -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js" integrity="sha512-8BHxHDLsOHx+flIrQ0DrZcea7MkHqRU5GbTHmbdzMRnAaoCIkZ97PqZcXJkKZckMMhqfoeaJE+DNUVuyoQsO3Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <!-- Phaser.js -->
+        <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.js"></script>
     </head> 
     <body> 
         <div 
@@ -120,6 +122,19 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Contenedor del juego Phaser (oculto inicialmente) -->
+                <div id="juegoContainer" style="display:none;">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h4>🎮 Mario Bros 2D - Partida en curso</h4>
+                        </div>
+                        <div class="card-body text-center">
+                            <div id="game"></div>
+                            <button id="btnSalirJuego" class="btn btn-danger mt-3">Salir del Juego</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Sección Acciones -->
@@ -147,6 +162,7 @@
                     <li>Google One Tap para acceso rápido</li>
                     <li>Gestión completa de usuarios (agregar, eliminar, listar)</li>
                     <li>Contraseñas cifradas con bcrypt</li>
+                    <li>Creación, listado y borrado de partidas con WebSockets</li>
                 </ul>
             </div>
         </div>
@@ -154,11 +170,22 @@
 
         <script src="./cliente/clienteRest.js"></script>
         <script src="./cliente/clienteWS.js"></script>
+        <!-- Entidades del juego -->
+        <script src="./cliente/entidades/Jugador.js"></script>
+        <script src="./cliente/entidades/OtroJugador.js"></script>
+        <script src="./cliente/entidades/Moneda.js"></script>
+        <script src="./cliente/entidades/Goomba.js"></script>
+        <script src="./cliente/entidades/Koopa.js"></script>
+        <script src="./cliente/entidades/Caparazon.js"></script>
+        <script src="./cliente/entidades/Champinon.js"></script>
+        <!-- Juego principal -->
+        <script src="./cliente/juego.js"></script>
         <script src="./cliente/controlWeb.js"></script>
 
         <script>
             rest=new ClienteRest();
             ws=new ClienteWS();
+            let juego; // Variable global para la instancia del juego
             cw=new ControlWeb();
             
             // Inicializar navegación

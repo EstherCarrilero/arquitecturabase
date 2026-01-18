@@ -439,12 +439,55 @@ function ControlWeb(){
         $("#estadoPartidaActual").show();
         
         $("#estadoPartida").html(`
-            <div class="alert alert-success">
-                <h6><i class="fas fa-check-circle"></i> ¡Partida completa!</h6>
-                <p class="mb-0">Código: <strong>${codigo}</strong></p>
-                <p class="mb-0">¡La partida está lista para comenzar!</p>
+            <div class="alert alert-success text-center">
+                <h4><i class="fas fa-check-circle"></i> ¡Partida completa!</h4>
+                <p class="mb-2">Código: <strong>${codigo}</strong></p>
+                <p class="mb-3">¡Ambos jugadores conectados!</p>
+                <button id="btnIniciarJuego" class="btn btn-primary btn-lg">
+                    🎮 Iniciar Juego
+                </button>
+                <div id="estadoEspera" style="display:none; margin-top: 15px;">
+                    <p class="text-info"><strong>Esperando a que el otro jugador esté listo...</strong></p>
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Cargando...</span>
+                    </div>
+                </div>
             </div>
         `);
+        
+        // Evento para indicar que este jugador está listo
+        $("#btnIniciarJuego").off("click").on("click", function() {
+            console.log("Jugador listo para iniciar");
+            // Enviar señal de que este jugador está listo
+            ws.jugadorListo(codigo);
+            // Deshabilitar botón y mostrar mensaje de espera
+            $("#btnIniciarJuego").prop("disabled", true).text("✓ Listo");
+            $("#estadoEspera").show();
+        });
+    }
+    
+    this.iniciarJuegoSincronizado=function(codigo){
+        console.log("Iniciando juego sincronizado con código:", codigo);
+        
+        // Ocultar estado de partida y mostrar canvas del juego
+        $("#estadoPartidaActual").hide();
+        $("#juegoContainer").show();
+        
+        // Crear instancia del juego Phaser
+        juego = new Juego();
+        juego.iniciar(codigo);
+        
+        // Configurar botón de salir del juego
+        $("#btnSalirJuego").off("click").on("click", function() {
+            if (confirm("¿Seguro que quieres salir del juego? Se abandonará la partida.")) {
+                if (juego) {
+                    juego.destruir();
+                    juego = null;
+                }
+                $("#juegoContainer").hide();
+                cw.abandonarPartida();
+            }
+        });
     }
     
     this.abandonarPartida=function(){
