@@ -34,23 +34,9 @@ class PlantaPirana {
         this.tiempoEscondida = 1500;
         this.fase = 'escondida'; // 'escondida','subiendo','visible','bajando'
 
-        // Partículas: usar 'coin_gold' como pequeñas burbujas/salpicadura (pre-cargado)
-        try {
-            this.particles = this.scene.add.particles('coin_gold');
-            this.emitter = this.particles.createEmitter({
-                x: this.x,
-                y: this.yEscondida,
-                speed: { min: -40, max: -80 },
-                angle: { min: 250, max: 290 },
-                scale: { start: 0.5, end: 0 },
-                lifespan: 600,
-                gravityY: 200,
-                quantity: 0
-            });
-        } catch (e) {
-            this.particles = null;
-            this.emitter = null;
-        }
+        // Partículas: desactivadas para compatibilidad con Phaser >=3.60
+        this.particles = null;
+        this.emitter = null;
     }
 
     // Método llamado desde el bucle principal para actualizar la planta
@@ -63,10 +49,7 @@ class PlantaPirana {
             if (tiempoEnFase > this.tiempoEscondida) {
                 this.fase = 'subiendo';
                 this.cicloTiempo = tiempoActual;
-                // generar partículas al inicio de la subida (salpicadura) - más intensa
-                if (this.emitter && this.emitter.explode) {
-                    try { this.emitter.explode(12, this.x, this.yEscondida); } catch(e) {}
-                }
+                // Partículas deshabilitadas (no usar emitter para evitar errores en Phaser >=3.60)
             }
         } else if (this.fase === 'subiendo') {
             // Movimiento hacia arriba: usar sprite 'up' y aplicar easing CUBIC.Out (deceleración al llegar arriba)

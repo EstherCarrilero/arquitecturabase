@@ -22,7 +22,18 @@ class Caparazon {
             try { spriteExistente.destroy(); } catch(e){}
         }
         this.sprite = scene.physics.add.sprite(x, y, 'snail_shell');
-        this.sprite.setDisplaySize(34, 24);
+        // Aumentar ligeramente el tamaño visual del caparazón (solo el caparazón)
+        this.sprite.setDisplaySize(44, 32);
+        // Ajustar el cuerpo físico para que coincida con el tamaño visual
+        try {
+            const dw = this.sprite.displayWidth;
+            const dh = this.sprite.displayHeight;
+            this.sprite.body.setSize(dw, dh);
+            // Centrar el cuerpo respecto al sprite original
+            const offsetX = (this.sprite.width - dw) / 2;
+            const offsetY = (this.sprite.height - dh) / 2;
+            this.sprite.body.setOffset(offsetX, offsetY);
+        } catch (e) {}
         this.sprite.body.setCollideWorldBounds(true);
         this.sprite.body.setBounce(0.3, 0);
         this.sprite.body.setImmovable(false);
@@ -51,6 +62,18 @@ class Caparazon {
         // Mantener referencia al estado para compatibilidad
         this.sprite.estado = 'caparazon';
         this.sprite.velocidadCaparazon = this.velocidad;
+
+        // Si el sprite que venía del Koopa indicaba que miraba a la derecha,
+        // usar la variante de textura derecha para el caparazón.
+        try {
+            if (spriteExistente) {
+                // spriteExistente puede ser el GameObject del Koopa antes de destruirse
+                const koopaDir = (spriteExistente.koopaRef && spriteExistente.koopaRef.direccion) || (spriteExistente.body && spriteExistente.body.velocity && spriteExistente.body.velocity.x > 0 ? 1 : -1);
+                if (koopaDir > 0) {
+                    if (this.sprite.setTexture) this.sprite.setTexture('snail_shell_right');
+                }
+            }
+        } catch (e) {}
     }
     
     /**
@@ -149,6 +172,14 @@ class Caparazon {
                 this.sprite.body.setVelocityX(this.velocidad);
                 this.sprite.velocidadCaparazon = this.velocidad;
             }
+            // Actualizar textura del caparazón según dirección
+            try {
+                if (this.velocidad > 0) {
+                    if (this.sprite.setTexture) this.sprite.setTexture('snail_shell_right');
+                } else if (this.velocidad < 0) {
+                    if (this.sprite.setTexture) this.sprite.setTexture('snail_shell');
+                }
+            } catch (e) {}
         } else {
             // Caparazón quieto
             this.sprite.body.setVelocityX(0);

@@ -45,7 +45,7 @@ function Juego() {
     let puntosOtro = 0; // Puntos del otro jugador
     let comboEnemigos = 0; // Contador de enemigos derrotados sin tocar suelo
     let enElAire = false; // Flag para detectar si está en el aire
-    let textoMiPuntuacion, textoOtroPuntuacion; // Textos en pantalla
+    let textoMiPuntuacionTens, textoMiPuntuacionUnits, textoOtroPuntuacionTens, textoOtroPuntuacionUnits; // Textos en pantalla (decenas + unidades)
     let textoMiVidas, textoOtraVidas; // Textos de vidas
 
     // Helper para actualizar un sprite dígito del HUD (muestra sólo la cifra de las unidades)
@@ -53,6 +53,19 @@ function Juego() {
         const n = Math.max(0, Math.min(9, Math.floor(number) % 10));
         if (sprite && typeof sprite.setTexture === 'function') {
             sprite.setTexture('hud_character_' + n);
+        }
+    }
+
+    // Helper para actualizar dos sprites dígito del HUD (decenas + unidades)
+    function setHudTwoDigits(spriteTens, spriteUnits, number) {
+        const n = Math.max(0, Math.min(99, Math.floor(number)));
+        const tens = Math.floor(n / 10) % 10;
+        const units = n % 10;
+        if (spriteTens && typeof spriteTens.setTexture === 'function') {
+            spriteTens.setTexture('hud_character_' + tens);
+        }
+        if (spriteUnits && typeof spriteUnits.setTexture === 'function') {
+            spriteUnits.setTexture('hud_character_' + units);
         }
     }
     let otroJugadorTarget = {x: 100, y: 450}; // Posición objetivo del otro jugador - DEPRECADO (ahora en clase OtroJugador)
@@ -110,6 +123,13 @@ function Juego() {
         this.load.image('player-walk-b', 'cliente/assets/images/character_yellow_walk_b.png');
         this.load.image('player-jump', 'cliente/assets/images/character_yellow_jump.png');
         this.load.image('player-hit', 'cliente/assets/images/character_yellow_hit.png');
+        // Left-facing variants for yellow player
+        this.load.image('player-front-left', 'cliente/assets/images/character_yellow_front_left.png');
+        this.load.image('player-idle-left', 'cliente/assets/images/character_yellow_idle_left.png');
+        this.load.image('player-walk-a-left', 'cliente/assets/images/character_yellow_walk_a_left.png');
+        this.load.image('player-walk-b-left', 'cliente/assets/images/character_yellow_walk_b_left.png');
+        this.load.image('player-jump-left', 'cliente/assets/images/character_yellow_jump_left.png');
+        this.load.image('player-hit-left', 'cliente/assets/images/character_yellow_hit_left.png');
         // Cargar versión rosa para el jugador remoto
         this.load.image('player-pink-front', 'cliente/assets/images/character_pink_front.png');
         this.load.image('player-pink-idle', 'cliente/assets/images/character_pink_idle.png');
@@ -117,6 +137,13 @@ function Juego() {
         this.load.image('player-pink-walk-b', 'cliente/assets/images/character_pink_walk_b.png');
         this.load.image('player-pink-jump', 'cliente/assets/images/character_pink_jump.png');
         this.load.image('player-pink-hit', 'cliente/assets/images/character_pink_hit.png');
+        // Left-facing variants for pink player
+        this.load.image('player-pink-front-left', 'cliente/assets/images/character_pink_front_left.png');
+        this.load.image('player-pink-idle-left', 'cliente/assets/images/character_pink_idle_left.png');
+        this.load.image('player-pink-walk-a-left', 'cliente/assets/images/character_pink_walk_a_left.png');
+        this.load.image('player-pink-walk-b-left', 'cliente/assets/images/character_pink_walk_b_left.png');
+        this.load.image('player-pink-jump-left', 'cliente/assets/images/character_pink_jump_left.png');
+        this.load.image('player-pink-hit-left', 'cliente/assets/images/character_pink_hit_left.png');
         // Ground tiles
         this.load.image('ground_top', 'cliente/assets/images/terrain_grass_block_top.png');
         this.load.image('ground_top_left', 'cliente/assets/images/terrain_grass_block_top_left.png');
@@ -132,11 +159,21 @@ function Juego() {
         this.load.image('snail_rest', 'cliente/assets/images/snail_rest.png');
         this.load.image('snail_walk_a', 'cliente/assets/images/snail_walk_a.png');
         this.load.image('snail_walk_b', 'cliente/assets/images/snail_walk_b.png');
+        // Right-facing variants for Koopa/snail
+        this.load.image('snail_rest_right', 'cliente/assets/images/snail_rest_right.png');
+        this.load.image('snail_shell_right', 'cliente/assets/images/snail_shell_right.png');
+        this.load.image('snail_walk_a_right', 'cliente/assets/images/snail_walk_a_right.png');
+        this.load.image('snail_walk_b_right', 'cliente/assets/images/snail_walk_b_right.png');
         // Goomba / slime sprites
         this.load.image('slime-flat', 'cliente/assets/images/slime_fire_flat.png');
         this.load.image('slime-rest', 'cliente/assets/images/slime_fire_rest.png');
         this.load.image('slime-walk-a', 'cliente/assets/images/slime_fire_walk_a.png');
         this.load.image('slime-walk-b', 'cliente/assets/images/slime_fire_walk_b.png');
+        // Right-facing variants
+        this.load.image('slime-flat-right', 'cliente/assets/images/slime_fire_flat_right.png');
+        this.load.image('slime-rest-right', 'cliente/assets/images/slime_fire_rest_right.png');
+        this.load.image('slime-walk-a-right', 'cliente/assets/images/slime_fire_walk_a_right.png');
+        this.load.image('slime-walk-b-right', 'cliente/assets/images/slime_fire_walk_b_right.png');
         // Champiñón (star) sprite
         this.load.image('star', 'cliente/assets/images/star.png');
         // Coin sprites
@@ -217,12 +254,70 @@ function Juego() {
             repeat: 0
         });
 
+        // Left-facing player animations
+        this.anims.create({
+            key: 'player-walk-left',
+            frames: [ { key: 'player-walk-a-left' }, { key: 'player-walk-b-left' } ],
+            frameRate: 8,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-idle-left',
+            frames: [ { key: 'player-front-left' }, { key: 'player-idle-left' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-jump-left',
+            frames: [ { key: 'player-jump-left' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-hit-left',
+            frames: [ { key: 'player-hit-left' } ],
+            frameRate: 1,
+            repeat: 0
+        });
+
         // Animaciones para el jugador rosa (otro jugador)
         this.anims.create({
             key: 'player-pink-walk',
             frames: [ { key: 'player-pink-walk-a' }, { key: 'player-pink-walk-b' } ],
             frameRate: 8,
             repeat: -1
+        });
+
+        // Left-facing animations for pink player
+        this.anims.create({
+            key: 'player-pink-walk-left',
+            frames: [ { key: 'player-pink-walk-a-left' }, { key: 'player-pink-walk-b-left' } ],
+            frameRate: 8,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-pink-idle-left',
+            frames: [ { key: 'player-pink-front-left' }, { key: 'player-pink-idle-left' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-pink-jump-left',
+            frames: [ { key: 'player-pink-jump-left' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'player-pink-hit-left',
+            frames: [ { key: 'player-pink-hit-left' } ],
+            frameRate: 1,
+            repeat: 0
         });
 
         this.anims.create({
@@ -253,6 +348,13 @@ function Juego() {
             frameRate: 6,
             repeat: -1
         });
+        // Right-facing koopa animations
+        this.anims.create({
+            key: 'koopa-walk-right',
+            frames: [ { key: 'snail_walk_a_right' }, { key: 'snail_walk_b_right' } ],
+            frameRate: 6,
+            repeat: -1
+        });
         this.anims.create({
             key: 'koopa-rest',
             frames: [ { key: 'snail_rest' } ],
@@ -260,8 +362,20 @@ function Juego() {
             repeat: -1
         });
         this.anims.create({
+            key: 'koopa-rest-right',
+            frames: [ { key: 'snail_rest_right' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+        this.anims.create({
             key: 'shell-idle',
             frames: [ { key: 'snail_shell' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+        this.anims.create({
+            key: 'shell-idle-right',
+            frames: [ { key: 'snail_shell_right' } ],
             frameRate: 1,
             repeat: -1
         });
@@ -273,6 +387,13 @@ function Juego() {
             frameRate: 6,
             repeat: -1
         });
+        // Right-facing goomba animations
+        this.anims.create({
+            key: 'goomba-walk-right',
+            frames: [ { key: 'slime-walk-a-right' }, { key: 'slime-walk-b-right' } ],
+            frameRate: 6,
+            repeat: -1
+        });
         this.anims.create({
             key: 'goomba-rest',
             frames: [ { key: 'slime-rest' } ],
@@ -280,8 +401,20 @@ function Juego() {
             repeat: -1
         });
         this.anims.create({
+            key: 'goomba-rest-right',
+            frames: [ { key: 'slime-rest-right' } ],
+            frameRate: 1,
+            repeat: -1
+        });
+        this.anims.create({
             key: 'goomba-flat',
             frames: [ { key: 'slime-flat' } ],
+            frameRate: 1,
+            repeat: 0
+        });
+        this.anims.create({
+            key: 'goomba-flat-right',
+            frames: [ { key: 'slime-flat-right' } ],
             frameRate: 1,
             repeat: 0
         });
@@ -586,12 +719,7 @@ function Juego() {
             let bloquePregunta1 = bpObj1.getSprite();
             bloques.add(bloquePregunta1);
             bloquesPregunta.push(bloquePregunta1);
-            bloquePregunta1.simbolo = this.add.text(296, 400, '?', {
-                fontSize: '20px',
-                color: '#8B4513',
-                fontStyle: 'bold'
-            });
-            bloquePregunta1.simbolo.setOrigin(0.5, 0.5);
+            
             
             // Grupo 2: Escalera de bloques
             for (let i = 0; i < 5; i++) {
@@ -605,12 +733,7 @@ function Juego() {
             let bloquePregunta2 = bpObj2.getSprite();
             bloques.add(bloquePregunta2);
             bloquesPregunta.push(bloquePregunta2);
-            bloquePregunta2.simbolo = this.add.text(900, 320, '?', {
-                fontSize: '20px',
-                color: '#8B4513',
-                fontStyle: 'bold'
-            });
-            bloquePregunta2.simbolo.setOrigin(0.5, 0.5);
+            
             
             for (let i = 0; i < 2; i++) {
                 const bObj = new BloqueRompible(this, 932 + i*32, 320, bloqueIdCounter++);
@@ -631,12 +754,7 @@ function Juego() {
             let bloquePregunta3 = bpObj3.getSprite();
             bloques.add(bloquePregunta3);
             bloquesPregunta.push(bloquePregunta3);
-            bloquePregunta3.simbolo = this.add.text(1800, 350, '?', {
-                fontSize: '20px',
-                color: '#8B4513',
-                fontStyle: 'bold'
-            });
-            bloquePregunta3.simbolo.setOrigin(0.5, 0.5);
+            
             
         } else {
             // NIVEL 2 (DIFÍCIL): Bloques más dispersos y difíciles de alcanzar
@@ -653,12 +771,7 @@ function Juego() {
             let bloquePregunta1 = bpObj1.getSprite();
             bloques.add(bloquePregunta1);
             bloquesPregunta.push(bloquePregunta1);
-            bloquePregunta1.simbolo = this.add.text(364, 300, '?', {
-                fontSize: '20px',
-                color: '#8B4513',
-                fontStyle: 'bold'
-            });
-            bloquePregunta1.simbolo.setOrigin(0.5, 0.5);
+            
             
             // Grupo 2: Bloques sobre primer hueco
             for (let i = 0; i < 3; i++) {
@@ -679,12 +792,7 @@ function Juego() {
             let bloquePregunta2 = bpObj2.getSprite();
             bloques.add(bloquePregunta2);
             bloquesPregunta.push(bloquePregunta2);
-            bloquePregunta2.simbolo = this.add.text(1596, 280, '?', {
-                fontSize: '20px',
-                color: '#8B4513',
-                fontStyle: 'bold'
-            });
-            bloquePregunta2.simbolo.setOrigin(0.5, 0.5);
+            
             
             // Grupo 4: Plataforma alta y lejana
             for (let i = 0; i < 5; i++) {
@@ -698,12 +806,7 @@ function Juego() {
             let bloquePregunta3 = bpObj3.getSprite();
             bloques.add(bloquePregunta3);
             bloquesPregunta.push(bloquePregunta3);
-            bloquePregunta3.simbolo = this.add.text(2100, 380, '?', {
-                fontSize: '20px',
-                color: '#8B4513',
-                fontStyle: 'bold'
-            });
-            bloquePregunta3.simbolo.setOrigin(0.5, 0.5);
+            
         }
         
         // === TUBOS VERDES (estilo Mario) ===
@@ -1142,9 +1245,13 @@ function Juego() {
         hudCoinMi.setScrollFactor(0);
         hudCoinMi.setDepth(100);
 
-        textoMiPuntuacion = this.add.image(180, 28, 'hud_character_0').setScale(0.6);
-        textoMiPuntuacion.setScrollFactor(0);
-        textoMiPuntuacion.setDepth(100);
+        // Dos sprites para mostrar decenas + unidades de monedas
+        textoMiPuntuacionTens = this.add.image(174, 28, 'hud_character_0').setScale(0.6);
+        textoMiPuntuacionUnits = this.add.image(192, 28, 'hud_character_0').setScale(0.6);
+        textoMiPuntuacionTens.setScrollFactor(0);
+        textoMiPuntuacionUnits.setScrollFactor(0);
+        textoMiPuntuacionTens.setDepth(100);
+        textoMiPuntuacionUnits.setDepth(100);
 
         // Línea 2: Jugador 2 (rosa) - usar sprites HUD
         let hudIconOtro = this.add.image(36, 70, 'hud_player_pink').setScale(0.6);
@@ -1163,9 +1270,13 @@ function Juego() {
         hudCoinOtro.setScrollFactor(0);
         hudCoinOtro.setDepth(100);
 
-        textoOtroPuntuacion = this.add.image(180, 70, 'hud_character_0').setScale(0.6);
-        textoOtroPuntuacion.setScrollFactor(0);
-        textoOtroPuntuacion.setDepth(100);
+        // Dos sprites para mostrar decenas + unidades del otro jugador
+        textoOtroPuntuacionTens = this.add.image(174, 70, 'hud_character_0').setScale(0.6);
+        textoOtroPuntuacionUnits = this.add.image(192, 70, 'hud_character_0').setScale(0.6);
+        textoOtroPuntuacionTens.setScrollFactor(0);
+        textoOtroPuntuacionUnits.setScrollFactor(0);
+        textoOtroPuntuacionTens.setDepth(100);
+        textoOtroPuntuacionUnits.setDepth(100);
         
         // Aplicar configuración específica del nivel
         if (numero === 1) {
@@ -1209,8 +1320,8 @@ function Juego() {
         ws.socket.on("actualizacionPuntuacion", function(datos) {
             if (datos && datos.puntuacion !== undefined) {
                 puntuacionOtro = datos.puntuacion;
-                if (textoOtroPuntuacion) {
-                    setHudDigit(textoOtroPuntuacion, puntuacionOtro);
+                if (textoOtroPuntuacionTens) {
+                    setHudTwoDigits(textoOtroPuntuacionTens, textoOtroPuntuacionUnits, puntuacionOtro);
                 }
             }
         });
@@ -1390,9 +1501,17 @@ function Juego() {
         ws.socket.on("estadoGrandeCambiado", function(datos) {
             console.log("Estado grande del otro jugador cambiado:", datos.grande);
             if (jugadorRemoto) {
+                // Si el rival pierde el powerup, mostrar golpe
+                try {
+                    if (otroJugadorGrande && !datos.grande) {
+                        if (typeof jugadorRemoto.recibirGolpe === 'function') jugadorRemoto.recibirGolpe();
+                    }
+                } catch(e) {}
                 jugadorRemoto.actualizarTamaño(datos.grande);
                 console.log("Otro jugador actualizado en pantalla - Grande:", datos.grande);
             }
+            // Actualizar estado almacenado
+            try { otroJugadorGrande = !!datos.grande; } catch(e) {}
         });
         
         // Recibir cambios de vidas del rival
@@ -1401,6 +1520,13 @@ function Juego() {
             if (textoOtraVidas) {
                 setHudDigit(textoOtraVidas, datos.vidas);
             }
+            try {
+                if (typeof vidasOtro !== 'undefined' && datos.vidas < vidasOtro) {
+                    if (jugadorRemoto && typeof jugadorRemoto.recibirGolpe === 'function') jugadorRemoto.recibirGolpe();
+                }
+            } catch(e) {}
+            // Actualizar contador local
+            try { vidasOtro = datos.vidas; } catch(e) {}
         });
         
         // Recibir notificación de que el otro jugador llegó a la meta
@@ -1422,7 +1548,7 @@ function Juego() {
     function recogerMoneda(moneda) {
         moneda.recoger(); // Usa el método de la clase Moneda
         puntuacionJugador++;
-        setHudDigit(textoMiPuntuacion, puntuacionJugador);
+        setHudTwoDigits(textoMiPuntuacionTens, textoMiPuntuacionUnits, puntuacionJugador);
         
         // Sumar 200 puntos por moneda
         puntosJugador += 200;
@@ -1473,7 +1599,7 @@ function Juego() {
         let enemigoMitadSuperiorY = koopaSprite.y - (koopaSprite.displayHeight / 4);
         
         // Agregar margen de tolerancia para detección más robusta
-        let margen = 15;
+        let margen = 10;
         let estaCayendo = jugador.body.velocity.y >= 0;
         let golpeDesdeArriba = estaCayendo && jugadorPiesY < (enemigoMitadSuperiorY + margen);
         

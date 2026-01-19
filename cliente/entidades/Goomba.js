@@ -48,10 +48,17 @@ class Goomba {
         // Animaciones: caminar cuando se mueve, descansar cuando esté parado
         try {
             let vx = this.sprite.body.velocity.x || 0;
+            // Seleccionar animación según dirección (derecha = variantes '_right')
             if (Math.abs(vx) > 10) {
-                if (this.sprite.anims) this.sprite.play('goomba-walk', true);
+                if (this.sprite.anims) {
+                    if (vx > 0) this.sprite.play('goomba-walk-right', true);
+                    else this.sprite.play('goomba-walk', true);
+                }
             } else {
-                if (this.sprite.anims) this.sprite.play('goomba-rest', true);
+                if (this.sprite.anims) {
+                    if (this.direccion > 0) this.sprite.play('goomba-rest-right', true);
+                    else this.sprite.play('goomba-rest', true);
+                }
             }
         } catch (e) {}
     }
@@ -68,7 +75,10 @@ class Goomba {
         this.sprite.body.setVelocity(0, 0);
         // Cambiar textura a 'flat' cuando es pisado
         try {
-            if (this.sprite.setTexture) this.sprite.setTexture('slime-flat');
+            if (this.sprite.setTexture) {
+                if (this.direccion > 0) this.sprite.setTexture('slime-flat-right');
+                else this.sprite.setTexture('slime-flat');
+            }
             this.sprite.setDisplaySize(46, 14);
         } catch (e) {}
 

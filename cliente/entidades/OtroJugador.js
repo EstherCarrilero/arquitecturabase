@@ -1,6 +1,9 @@
 class OtroJugador {
     constructor(scene, x, y, color = 0x0000ff) {
         this.scene = scene;
+        this.facing = 'right';
+        this.lastHitAt = 0;
+        this.blinkInterval = null;
         this.grande = false;
         this.muerto = false;
         this.target = { x: x, y: y };
@@ -25,7 +28,44 @@ class OtroJugador {
     mostrar() {
         if (this.muerto) return;
         this.sprite.visible = true;
-        try { if (this.sprite.anims) this.sprite.play('player-pink-idle', true); } catch(e){}
+        try { if (this.sprite.anims) this.sprite.play(this.facing === 'left' ? 'player-pink-idle-left' : 'player-pink-idle', true); } catch(e){}
+    }
+
+    recibirGolpe() {
+        if (this.muerto) return;
+        try {
+            if (this.sprite && this.sprite.anims) {
+                const key = this.facing === 'left' ? 'player-pink-hit-left' : 'player-pink-hit';
+                this.sprite.play(key);
+                this.lastHitAt = Date.now();
+                // Activar parpadeo visual al recibir daño
+                try { this.activarParpadeo(); } catch(e) {}
+            }
+        } catch (e) {
+            console.warn('Error en recibirGolpe de OtroJugador:', e);
+        }
+    }
+
+    activarParpadeo() {
+        // No iniciar parpadeo si el jugador ya está marcado como muerto
+        if (this.muerto) return;
+        try {
+            if (this.blinkInterval) {
+                clearInterval(this.blinkInterval);
+                this.blinkInterval = null;
+            }
+        } catch (e) {}
+        let parpadeos = 0;
+        this.blinkInterval = setInterval(() => {
+            if (!this.sprite) return;
+            this.sprite.visible = !this.sprite.visible;
+            parpadeos++;
+            if (parpadeos >= 12) {
+                try { clearInterval(this.blinkInterval); } catch(e) {}
+                this.blinkInterval = null;
+                if (this.sprite) this.sprite.visible = true;
+            }
+        }, 166);
     }
     
     ocultar() {
@@ -43,6 +83,13 @@ class OtroJugador {
     morir() {
         try {
             this.muerto = true;
+            // Si hay un parpadeo en curso, pararlo para evitar que vuelva a mostrarse
+            try {
+                if (this.blinkInterval) {
+                    clearInterval(this.blinkInterval);
+                    this.blinkInterval = null;
+                }
+            } catch (e) {}
             // Ocultar sprite y desactivar body
             if (this.sprite) {
                 this.sprite.visible = false;
@@ -75,7 +122,7 @@ class OtroJugador {
                         this.sprite.body.setSize(width, height, false);
                     }
                 }
-                if (this.sprite.anims) this.sprite.play('player-pink-idle');
+                if (this.sprite.anims) this.sprite.play(this.facing === 'left' ? 'player-pink-idle-left' : 'player-pink-idle');
             } catch (e) {
                 console.warn('Error al revivir OtroJugador:', e);
             }
@@ -88,6 +135,12 @@ class OtroJugador {
         this.ultimaPosicionRecibida = Date.now();
         this.target.x = x;
         this.target.y = y;
+        // Determinar dirección basada en la nueva posición relativa a la anterior
+        try {
+            if (typeof this.ultimaPosicion.x === 'number') {
+                this.facing = (this.target.x < this.ultimaPosicion.x) ? 'left' : 'right';
+            }
+        } catch (e) {}
     }
     
     actualizarTamaño(grande) {
@@ -141,20 +194,30 @@ class OtroJugador {
             this.sprite.y = Phaser.Math.Linear(this.sprite.y, this.target.y, factorInterpolacion);
             // Elegir animación según movimiento
             try {
+                    // Priorizar animación de golpe durante un breve periodo
+                    const HIT_DURATION = 400;
+                    if (this.lastHitAt && (Date.now() - this.lastHitAt) < HIT_DURATION) {
+                        const hitKey = this.facing === 'left' ? 'player-pink-hit-left' : 'player-pink-hit';
+                        if (this.sprite.anims) this.sprite.play(hitKey, true);
+                        return;
+                    }
                 // Si hay movimiento vertical pronunciado hacia arriba, reproducir salto
-                if (Math.abs(distY) > 6 && this.target.y < this.sprite.y) {
-                    if (this.sprite.anims) this.sprite.play('player-pink-jump', true);
-                } else if (Math.abs(distX) > 1) {
-                    if (this.sprite.anims) this.sprite.play('player-pink-walk', true);
-                } else {
-                    if (this.sprite.anims) this.sprite.play('player-pink-idle', true);
-                }
+                    let jumpKey = this.facing === 'left' ? 'player-pink-jump-left' : 'player-pink-jump';
+                    let walkKey = this.facing === 'left' ? 'player-pink-walk-left' : 'player-pink-walk';
+                    let idleKey = this.facing === 'left' ? 'player-pink-idle-left' : 'player-pink-idle';
+                    if (Math.abs(distY) > 6 && this.target.y < this.sprite.y) {
+                        if (this.sprite.anims) this.sprite.play(jumpKey, true);
+                    } else if (Math.abs(distX) > 1) {
+                        if (this.sprite.anims) this.sprite.play(walkKey, true);
+                    } else {
+                        if (this.sprite.anims) this.sprite.play(idleKey, true);
+                    }
             } catch (e) {}
         } else {
             // Snappear si está muy cerca
             this.sprite.x = this.target.x;
             this.sprite.y = this.target.y;
-            try { if (this.sprite.anims) this.sprite.play('player-pink-idle', true); } catch(e){}
+            try { if (this.sprite.anims) this.sprite.play(this.facing === 'left' ? 'player-pink-idle-left' : 'player-pink-idle', true); } catch(e){}
         }
     }
 }

@@ -24,8 +24,21 @@ class Koopa {
         this.direccion = -1; // -1 = izquierda, 1 = derecha
         this.velocidad = 60;
         this.sprite.body.setVelocityX(this.direccion * this.velocidad);
-        // Reproducir animación inicial
-        try { if (this.sprite.anims) this.sprite.play('koopa-rest'); } catch(e){}
+        // Reproducir animación inicial si las animaciones ya existen.
+        try {
+            const anims = this.scene && this.scene.anims;
+            const hasRest = anims && (typeof anims.exists === 'function') && (anims.exists('koopa-rest') || anims.exists('koopa-rest-right'));
+            if (hasRest && this.sprite.anims) {
+                if (this.direccion > 0 && anims.exists('koopa-rest-right')) this.sprite.play('koopa-rest-right');
+                else if (anims.exists('koopa-rest')) this.sprite.play('koopa-rest');
+            } else {
+                // Si no hay animaciones definidas todavía, usar la textura estática correspondiente
+                try {
+                    if (this.direccion > 0) this.sprite.setTexture('snail_rest_right');
+                    else this.sprite.setTexture('snail_rest');
+                } catch (e) {}
+            }
+        } catch (e) {}
         
         // Estado
         this.activo = true;
@@ -83,9 +96,15 @@ class Koopa {
         try {
             let vx = this.sprite.body.velocity.x || 0;
             if (Math.abs(vx) > 10) {
-                if (this.sprite.anims) this.sprite.play('koopa-walk', true);
+                if (this.sprite.anims) {
+                    if (vx > 0) this.sprite.play('koopa-walk-right', true);
+                    else this.sprite.play('koopa-walk', true);
+                }
             } else {
-                if (this.sprite.anims) this.sprite.play('koopa-rest', true);
+                if (this.sprite.anims) {
+                    if (this.direccion > 0) this.sprite.play('koopa-rest-right', true);
+                    else this.sprite.play('koopa-rest', true);
+                }
             }
         } catch (e) {}
     }

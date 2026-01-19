@@ -6,6 +6,7 @@ class Jugador {
         this.invulnerable = false;
         this.tiempoInvulnerabilidad = 0;
         this.facing = 'right';
+        this.lastHitAt = 0;
         this.blinkInterval = null;
         this.controlsEnabled = true;
         this.muerto = false;
@@ -155,16 +156,41 @@ class Jugador {
     
     perderVida() {
         if (this.grande) {
+            // Mostrar frame de golpe al perder el powerup
+            try { if (this.sprite && this.sprite.anims) this.sprite.play(this.facing === 'left' ? 'player-hit-left' : 'player-hit'); } catch(e){}
+            try { this.lastHitAt = Date.now(); } catch(e) {}
             this.reducirTamaño();
             this.activarInvulnerabilidad();
+            // Efecto de parpadeo igual que cuando recibe daño sin powerup
+            try {
+                if (this.blinkInterval) {
+                    clearInterval(this.blinkInterval);
+                    this.blinkInterval = null;
+                }
+            } catch (e) {}
+            let parpadeos = 0;
+            this.blinkInterval = setInterval(() => {
+                if (!this.sprite) return;
+                this.sprite.visible = !this.sprite.visible;
+                if (this.indicador) this.indicador.visible = !this.indicador.visible;
+                parpadeos++;
+                if (parpadeos >= 12) {
+                    clearInterval(this.blinkInterval);
+                    this.blinkInterval = null;
+                    if (this.sprite) this.sprite.visible = true;
+                    if (this.indicador) this.indicador.visible = true;
+                }
+            }, 166);
+
             return false; // No pierde vida, solo se reduce
         }
         
         this.vidas--;
         this.activarInvulnerabilidad();
         
-        // Reproducir frame de golpe
-        try { if (this.sprite && this.sprite.anims) this.sprite.play('player-hit'); } catch(e){}
+        // Reproducir frame de golpe (usar variante left si corresponde)
+        try { if (this.sprite && this.sprite.anims) this.sprite.play(this.facing === 'left' ? 'player-hit-left' : 'player-hit'); } catch(e){}
+        try { this.lastHitAt = Date.now(); } catch(e) {}
         // Efecto visual de parpadeo
         let parpadeos = 0;
         this.blinkInterval = setInterval(() => {
@@ -234,10 +260,20 @@ class Jugador {
         try {
             let velX = this.sprite.body.velocity.x || 0;
             let enSuelo = (this.sprite.body.blocked && this.sprite.body.blocked.down) || (this.sprite.body.touching && this.sprite.body.touching.down);
-            if (enSuelo && Math.abs(velX) > 10) {
-                if (this.sprite.anims) this.sprite.play('player-walk', true);
+            // Priorizar animación de golpe durante un breve periodo
+            const HIT_DURATION = 400; // ms
+            if (this.lastHitAt && (Date.now() - this.lastHitAt) < HIT_DURATION) {
+                const hitKey = this.facing === 'left' ? 'player-hit-left' : 'player-hit';
+                if (this.sprite.anims) this.sprite.play(hitKey, true);
             } else {
-                if (this.sprite.anims) this.sprite.play('player-idle', true);
+                // Seleccionar animación según dirección
+                let walkKey = this.facing === 'left' ? 'player-walk-left' : 'player-walk';
+                let idleKey = this.facing === 'left' ? 'player-idle-left' : 'player-idle';
+                if (enSuelo && Math.abs(velX) > 10) {
+                    if (this.sprite.anims) this.sprite.play(walkKey, true);
+                } else {
+                    if (this.sprite.anims) this.sprite.play(idleKey, true);
+                }
             }
         } catch (e) {
             // si no existe body o anims, ignorar
@@ -256,7 +292,7 @@ class Jugador {
             if (this.sprite.body.touching.down && !jumpPressed) {
                 this.sprite.body.setVelocityY(-400);
                 nuevoJumpPressed = true;
-                try { if (this.sprite && this.sprite.anims) this.sprite.play('player-jump'); } catch(e){}
+                try { if (this.sprite && this.sprite.anims) this.sprite.play(this.facing === 'left' ? 'player-jump-left' : 'player-jump'); } catch(e){}
             }
             // Salto variable: mantener presionado = salto más alto
             else if (jumpPressed && this.sprite.body.velocity.y < 0) {
