@@ -157,6 +157,17 @@ function Juego() {
         this.load.image('hud_character_7', 'cliente/assets/images/hud_character_7.png');
         this.load.image('hud_character_8', 'cliente/assets/images/hud_character_8.png');
         this.load.image('hud_character_9', 'cliente/assets/images/hud_character_9.png');
+        // Flag sprites
+        this.load.image('flag_off_center', 'cliente/assets/images/flag_off_center.png');
+        this.load.image('flag_off_bottom', 'cliente/assets/images/flag_off_bottom.png');
+        this.load.image('flag_red_a', 'cliente/assets/images/flag_red_a.png');
+        this.load.image('flag_red_b', 'cliente/assets/images/flag_red_b.png');
+        // Plantas piraña sprites (fish used as piranha visuals)
+        this.load.image('fish_purple_down', 'cliente/assets/images/fish_purple_down.png');
+        this.load.image('fish_purple_up', 'cliente/assets/images/fish_purple_up.png');
+        // Tubería/Pipe sprites adicionales
+        this.load.image('terrain_grass_vertical_top', 'cliente/assets/images/terrain_grass_vertical_top.png');
+        this.load.image('water_top', 'cliente/assets/images/water_top.png');
         // Background images
         this.load.image('bg-solid-sky', 'cliente/assets/images/background_solid_sky.png');
         this.load.image('bg-fade-trees', 'cliente/assets/images/background_fade_trees.png');
@@ -697,36 +708,37 @@ function Juego() {
         
         // === TUBOS VERDES (estilo Mario) ===
         tubos = this.physics.add.staticGroup();
+        let listaTuberias = []; // Array de instancias Tuberia
         
         let datosTubos = [];
         if (numero === 1) {
             // NIVEL 1: Tubos más accesibles
             datosTubos = [
-                {x: 250, baseH: 80, topY: 470},
-                {x: 700, baseH: 120, topY: 430},
-                {x: 1100, baseH: 100, topY: 450},
-                {x: 1650, baseH: 140, topY: 410},
-                {x: 2050, baseH: 80, topY: 470}
+                {x: 250, altura: 80},
+                {x: 700, altura: 120},
+                {x: 1100, altura: 100},
+                {x: 1650, altura: 140},
+                {x: 2050, altura: 80}
             ];
         } else {
             // NIVEL 2: Tubos más altos y peligrosos
             datosTubos = [
-                {x: 350, baseH: 160, topY: 390},
-                {x: 850, baseH: 140, topY: 410},
-                {x: 1250, baseH: 120, topY: 430},
-                {x: 1700, baseH: 180, topY: 370},
-                {x: 2000, baseH: 160, topY: 390}
+                {x: 350, altura: 160},
+                {x: 850, altura: 140},
+                {x: 1250, altura: 120},
+                {x: 1700, altura: 180},
+                {x: 2000, altura: 160}
             ];
         }
         
-        datosTubos.forEach(tubo => {
-            let baseY = 568 - tubo.baseH/2;
-            let tuboBase = this.add.rectangle(tubo.x, baseY, 50, tubo.baseH, 0x00CC00);
-            let tuboTop = this.add.rectangle(tubo.x, tubo.topY, 60, 20, 0x00FF00);
-            this.physics.add.existing(tuboBase, true);
-            this.physics.add.existing(tuboTop, true);
-            tubos.add(tuboBase);
-            tubos.add(tuboTop);
+        datosTubos.forEach(tuboData => {
+            const tuberia = new Tuberia(this, tuboData.x, tuboData.altura);
+            listaTuberias.push(tuberia);
+            
+            // Agregar sprites sólidos al grupo de colisión (excluye agua)
+            tuberia.getSpritesColision().forEach(sprite => {
+                tubos.add(sprite);
+            });
         });
         
         // === PLANTAS PIRAÑA (rojas con verde) ===
@@ -749,33 +761,20 @@ function Juego() {
             ];
         }
         
-        tubosConPlantas.forEach(tuboData => {
-            // Crear la planta (cuerpo rojo con cabeza verde)
-            let planta = {
-                // Cuerpo de la planta (rojo)
-                cuerpo: this.add.rectangle(tuboData.x, tuboData.topY, 30, 40, 0xFF0000),
-                // Cabeza de la planta (verde)
-                cabeza: this.add.rectangle(tuboData.x, tuboData.topY - 25, 35, 25, 0x00FF00),
-                // Posiciones de animación
-                tuboY: tuboData.topY,
-                yEscondida: tuboData.topY + 20, // Dentro del tubo
-                yVisible: tuboData.topY - 40,   // Fuera del tubo
-                // Estado
-                visible: false,
-                activa: true,
-                cicloTiempo: Date.now(),
-                duracionCiclo: 3000 + Math.random() * 2000, // 3-5 segundos por ciclo
-                // Timing
-                tiempoVisible: 1500,   // 1.5 segundos visible
-                tiempoEscondida: 1500, // 1.5 segundos escondida
-                fase: 'escondida' // 'escondida', 'subiendo', 'visible', 'bajando'
-            };
-            
-            // Posicionar inicialmente escondida
-            planta.cuerpo.y = planta.yEscondida;
-            planta.cabeza.y = planta.yEscondida - 25;
-            
-            plantasPirana.push(planta);
+        tubosConPlantas.forEach((tuboData, index) => {
+            // Obtener la tubería correspondiente
+            const tuberia = listaTuberias[datosTubos.indexOf(tuboData)];
+            if (!tuberia) return; // protección
+            const waterY = tuberia.getWaterTopY();
+            if (waterY == null) return; // protección
+
+            // Crear una instancia de PlantaPirana (la clase maneja la apariencia)
+            try {
+                const plantaObj = new PlantaPirana(this, tuboData.x, waterY);
+                plantasPirana.push(plantaObj);
+            } catch (e) {
+                console.warn('No se pudo crear PlantaPirana:', e);
+            }
         });
         
         // === ESCALERAS (amarillas) ===
@@ -913,20 +912,22 @@ function Juego() {
         let metaX = numero === 1 ? 4300 : 2300; // Nivel 1 termina alrededor de x=4300
         let metaY = 568;
         
-        // Mástil de la bandera (gris oscuro, alto)
-        mastilBandera = this.add.rectangle(metaX, metaY - 150, 8, 300, 0x666666);
-        
-        // Bandera roja en la parte superior
-        bandera = this.add.polygon(metaX + 25, metaY - 280, [
-            0, 0,    // Esquina superior izquierda
-            50, 15,  // Punta derecha
-            0, 30    // Esquina inferior izquierda
-        ], 0xff0000);
-        
-        // Zona de detección de meta (invisible)
-        let zonaMeta = this.add.rectangle(metaX, metaY - 100, 80, 400, 0x00ff00, 0);
-        this.physics.add.existing(zonaMeta, true);
-        zonaMeta.isMeta = true;
+        // Bandera de meta (clase Bandera)
+        let zonaMeta = null;
+        try {
+            const banderaObj = new Bandera(this, metaX, metaY);
+            mastilBandera = banderaObj.getMastil();
+            zonaMeta = banderaObj.getZonaMeta();
+            // Asegurar que la zona tenga cuerpo físico
+            try { this.physics.add.existing(zonaMeta, true); } catch (e) {}
+            try { zonaMeta.isMeta = true; } catch (e) {}
+        } catch (e) {
+            // Fallback: crear mástil y zona como antes si la clase no está disponible
+            mastilBandera = this.add.rectangle(metaX, metaY - 150, 8, 300, 0x666666);
+            zonaMeta = this.add.rectangle(metaX, metaY - 100, 80, 400, 0x00ff00, 0);
+            this.physics.add.existing(zonaMeta, true);
+            zonaMeta.isMeta = true;
+        }
 
         // === JUGADORES ===
         // Crear jugador principal usando la clase Jugador
@@ -2351,23 +2352,28 @@ function Juego() {
         // === ANIMACIÓN DE PLANTAS PIRAÑA ===
         plantasPirana.forEach(planta => {
             if (!planta.activa) return;
-            
+
+            // Si la planta es una instancia moderna con método actualizar(), delegar
+            if (typeof planta.actualizar === 'function') {
+                planta.actualizar();
+                return;
+            }
+
+            // Compatibilidad: lógica antigua para objetos con cuerpo/cabeza separados
             let tiempoActual = Date.now();
             let tiempoEnFase = tiempoActual - planta.cicloTiempo;
-            
-            // Máquina de estados para la animación de la planta
+
             if (planta.fase === 'escondida') {
                 if (tiempoEnFase > planta.tiempoEscondida) {
                     planta.fase = 'subiendo';
                     planta.cicloTiempo = tiempoActual;
                 }
             } else if (planta.fase === 'subiendo') {
-                // Animar subida (500ms)
                 let progreso = Math.min(tiempoEnFase / 500, 1);
                 let yActual = planta.yEscondida + (planta.yVisible - planta.yEscondida) * progreso;
-                planta.cuerpo.y = yActual;
-                planta.cabeza.y = yActual - 25;
-                
+                if (planta.cuerpo) planta.cuerpo.y = yActual;
+                if (planta.cabeza) planta.cabeza.y = yActual - 25;
+
                 if (progreso >= 1) {
                     planta.fase = 'visible';
                     planta.visible = true;
@@ -2379,12 +2385,11 @@ function Juego() {
                     planta.cicloTiempo = tiempoActual;
                 }
             } else if (planta.fase === 'bajando') {
-                // Animar bajada (500ms)
                 let progreso = Math.min(tiempoEnFase / 500, 1);
                 let yActual = planta.yVisible + (planta.yEscondida - planta.yVisible) * progreso;
-                planta.cuerpo.y = yActual;
-                planta.cabeza.y = yActual - 25;
-                
+                if (planta.cuerpo) planta.cuerpo.y = yActual;
+                if (planta.cabeza) planta.cabeza.y = yActual - 25;
+
                 if (progreso >= 1) {
                     planta.fase = 'escondida';
                     planta.visible = false;
@@ -2565,7 +2570,8 @@ function Juego() {
         // === DETECCIÓN DE COLISIÓN CON PLANTAS PIRAÑA ===
         if (!jugadorPrincipal.esInvulnerable() && !jugadorPrincipal.esMuerto()) {
             plantasPirana.forEach(planta => {
-                if (planta.activa && planta.visible) {
+                // Daño al jugador si la planta está activa, independientemente de su fase (escondida/subiendo/visible/bajando)
+                if (planta.activa) {
                     // Verificar colisión con el cuerpo o la cabeza de la planta
                     let playerBounds = player.getBounds();
                     let cuerpoPlantaBounds = planta.cuerpo.getBounds();
