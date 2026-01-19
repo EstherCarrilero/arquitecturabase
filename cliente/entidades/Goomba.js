@@ -4,7 +4,8 @@ class Goomba {
         this.id = id;
         this.activo = true;
         this.direccion = -1; // -1 izquierda, 1 derecha
-        this.velocidad = 50;
+        // Igualar velocidad por defecto a la de Koopa
+        this.velocidad = 60;
         
         // Crear sprite del Goomba usando imágenes slime
         this.sprite = scene.physics.add.sprite(x, y, 'slime-rest');

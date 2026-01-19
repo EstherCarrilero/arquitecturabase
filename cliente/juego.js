@@ -429,6 +429,11 @@ function Juego() {
     function cargarNivel(numero) {
         console.log("Cargando nivel", numero);
 
+        // Variables de plataforma que pueden ser referenciadas por otras secciones
+        let baseWidth, secondWidth, secondStartX, thirdWidth, thirdStartX, fourthWidth, fourthStartX;
+        // Coordenadas compartidas para bloques/monedas ajustables
+        let breakableRowStartX, breakableRowY;
+
         // === NIVEL 1 PLATFORM BUILDERS ===
         // createFirstFloorPlatform: top, top_right, right, center
         function createFirstFloorPlatform(scene, group, startX, bottomY, width, height = 64) {
@@ -593,6 +598,23 @@ function Juego() {
         // Configurar cámara
         camara = this.cameras.main;
         camara.setBounds(0, 0, worldWidth, 600); // Límites de la cámara = límites del mundo
+
+        // === PAREDES INVISIBLES EN LOS LÍMITES DEL MUNDO ===
+        // Crear dos rectángulos invisibles a la izquierda y derecha para evitar que
+        // jugadores/enemigos caigan fuera del mapa.
+        try {
+            const wallThickness = 40; // grosor de la pared invisible
+            const worldHeight = 600;
+            // Pared izquierda (justo fuera del borde x=0)
+            const wallLeft = this.add.rectangle(-wallThickness/2, worldHeight/2, wallThickness, worldHeight, 0x000000, 0);
+            this.physics.add.existing(wallLeft, true);
+            // Pared derecha (justo fuera del borde x=worldWidth)
+            const wallRight = this.add.rectangle(worldWidth + wallThickness/2, worldHeight/2, wallThickness, worldHeight, 0x000000, 0);
+            this.physics.add.existing(wallRight, true);
+
+            // Guardar referencias por si necesitamos accederlas luego
+            this._worldWalls = { left: wallLeft, right: wallRight };
+        } catch (e) {}
         
         // === FONDO POR CAPAS (solo nivel 1) ===
         if (numero === 1) {
@@ -652,24 +674,44 @@ function Juego() {
         if (numero === 1) {
             // NIVEL 1: Estructura escalonada de 4 plataformas
             const groundHeight = 64;
-            const baseWidth = 1200; // Ancho de referencia para la primera plataforma
+            baseWidth = 1200; // Ancho de referencia para la primera plataforma
             
             // Primera plataforma (parte más larga, base izquierda)
             createFirstFloorPlatform(this, platforms, 0, 600, baseWidth, groundHeight);
             
             // Segunda plataforma (más corta, con hueco antes)
-            const secondWidth = baseWidth * 0.6; // 60% de la primera
-            const secondStartX = baseWidth + 200; // Hueco de 200px
+            secondWidth = baseWidth * 0.6; // 60% de la primera
+            secondStartX = baseWidth + 200; // Hueco de 200px
             createSecondFloorPlatform(this, platforms, secondStartX, 600, secondWidth, groundHeight);
             
-            // Tercera plataforma (igual de larga que la primera, con hueco antes)
-            const thirdStartX = secondStartX + secondWidth + 200; // Hueco de 200px
-            createThirdFloorPlatform(this, platforms, thirdStartX, 600, baseWidth, groundHeight);
+            // Tercera plataforma (más pequeña, con hueco antes)
+            thirdWidth = baseWidth * 0.65; // 65% de la primera
+            thirdStartX = secondStartX + secondWidth + 200; // Hueco de 200px
+            createThirdFloorPlatform(this, platforms, thirdStartX, 600, thirdWidth, groundHeight);
             
-            // Cuarta plataforma (2/3 de la primera, sin borde derecho)
-            const fourthWidth = baseWidth * 0.66; // 2/3 de la primera
-            const fourthStartX = thirdStartX + baseWidth + 100; // Hueco de 100px
+            // Cuarta plataforma (más pequeña, sin borde derecho)
+            fourthWidth = baseWidth * 0.35; // 35% de la primera
+            fourthStartX = thirdStartX + thirdWidth + 150; // Hueco de 100px
             createFourthFloorPlatform(this, platforms, fourthStartX, 600, fourthWidth, groundHeight);
+            // Ajustar los bounds del mundo para que terminen donde acaba el suelo
+            try {
+                const finalWorldWidth = fourthStartX + fourthWidth; // El mundo no debe continuar más allá del suelo
+                // Actualizar límites de física y cámara
+                this.physics.world.setBounds(0, 0, finalWorldWidth, 600);
+                if (camara) camara.setBounds(0, 0, finalWorldWidth, 600);
+
+                // Reposicionar la pared derecha invisible si fue creada anteriormente
+                try {
+                    const wallThickness = 40;
+                    const walls = this._worldWalls || {};
+                    if (walls.right && typeof walls.right.setX === 'function') {
+                        walls.right.setX(finalWorldWidth + wallThickness/2);
+                        if (walls.right.body && typeof walls.right.body.updateFromGameObject === 'function') {
+                            walls.right.body.updateFromGameObject();
+                        }
+                    }
+                } catch (e) { /* no crítico */ }
+            } catch (e) { /* no crítico */ }
             
         } else {
             // NIVEL 2 (DIFÍCIL): Múltiples huecos mortales
@@ -705,56 +747,111 @@ function Juego() {
         let bloqueIdCounter = 0;
         
         if (numero === 1) {
-            // NIVEL 1 (FÁCIL): Bloques accesibles y bien distribuidos
-            
-            // Grupo 1: Bloques bajos con champiñón
-            for (let i = 0; i < 3; i++) {
-                const bObj = new BloqueRompible(this, 200 + i*32, 400, bloqueIdCounter++);
+            // NIVEL 1: Nueva configuración en tercera plataforma
+            // Primera plataforma - Bloques flotantes: algunos normales, rompibles y un bloque de pregunta
+            const firstPlatformStartX = 0;
+            const firstBlockRowY = 300;
+            // Fila de 4 bloques normales cerca del inicio
+            for (let i = 0; i < 4; i++) {
+                const bObj = new Bloque(this, firstPlatformStartX + 180 + i*32, firstBlockRowY, bloqueIdCounter++);
                 let bloque = bObj.getSprite();
                 bloques.add(bloque);
-                bloquesRompibles.push(bloque);
+            }
+            // Bloque de pregunta al final de la fila (champiñón)
+            const bpObjA = new BloquePregunta(this, firstPlatformStartX + 180 + 4*32, firstBlockRowY, bloqueIdCounter++, 'champinon');
+            let bloquePreguntaA = bpObjA.getSprite();
+            bloques.add(bloquePreguntaA);
+            bloquesPregunta.push(bloquePreguntaA);
+            // Fila de bloques rompibles sobre la primera plataforma (encima del primer Goomba)
+            breakableRowStartX = firstPlatformStartX + 400; // centrado aproximadamente sobre x=400
+            breakableRowY = 200; // altura sobre el primer Goomba
+            for (let i = 0; i < 3; i++) {
+                const bR = new BloqueRompible(this, breakableRowStartX + i*32, breakableRowY, bloqueIdCounter++);
+                let br = bR.getSprite();
+                bloques.add(br);
+                bloquesRompibles.push(br);
             }
 
-            const bpObj1 = new BloquePregunta(this, 296, 400, bloqueIdCounter++, 'champinon');
+            // Segunda plataforma - Bloques flotantes: fila + pregunta + bloque rompible
+            const secondBlockRowY = 380;
+            for (let i = 0; i < 3; i++) {
+                const bObj = new Bloque(this, secondStartX + 50 + i*32, secondBlockRowY, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+            }
+            const bpObjB = new BloquePregunta(this, secondStartX + 50 + 3*32, secondBlockRowY, bloqueIdCounter++, 'moneda');
+            let bloquePreguntaB = bpObjB.getSprite();
+            bloques.add(bloquePreguntaB);
+            bloquesPregunta.push(bloquePreguntaB);
+            
+            // Tercera plataforma - Grupo 1: Fila de 3 bloques normales + 1 bloque pregunta (moneda) a altura media
+            const thirdPlatformStartX = secondStartX + secondWidth + 200;
+            const alturaMedia = 400; // Altura media sobre la tercera plataforma
+            
+            for (let i = 0; i < 3; i++) {
+                const bObj = new Bloque(this, thirdPlatformStartX + 50 + i*32, alturaMedia, bloqueIdCounter++);
+                let bloque = bObj.getSprite();
+                bloques.add(bloque);
+            }
+            const bpObj1 = new BloquePregunta(this, thirdPlatformStartX + 50 + 3*32, alturaMedia, bloqueIdCounter++, 'moneda');
             let bloquePregunta1 = bpObj1.getSprite();
             bloques.add(bloquePregunta1);
             bloquesPregunta.push(bloquePregunta1);
             
-            
-            // Grupo 2: Escalera de bloques
-            for (let i = 0; i < 5; i++) {
-                const bObj = new Bloque(this, 500 + i*32, 350 - i*30, bloqueIdCounter++);
-                let bloque = bObj.getSprite();
-                bloques.add(bloque);
+            // Tercera plataforma - Grupo 2: Cuadrado de 6x6 bloques rompibles (vacío por dentro)
+            const cuadradoStartX = thirdPlatformStartX + 280;
+            const cuadradoStartY = 350;
+            // Crear marco exterior de 6x6
+            for (let row = 0; row < 6; row++) {
+                for (let col = 0; col < 6; col++) {
+                    // Solo crear bloques en el borde (no rellenar el interior)
+                    if (row === 0 || row === 5 || col === 0 || col === 5) {
+                        const bObj = new BloqueRompible(this, cuadradoStartX + col*32, cuadradoStartY - row*32, bloqueIdCounter++);
+                        let bloque = bObj.getSprite();
+                        bloques.add(bloque);
+                        bloquesRompibles.push(bloque);
+                    }
+                }
             }
-            
-            // Grupo 3: Bloques con monedas
-            const bpObj2 = new BloquePregunta(this, 900, 320, bloqueIdCounter++, 'moneda');
+            // Bloque de pregunta con champiñón en el centro del cuadrado
+            const bpObj2 = new BloquePregunta(this, cuadradoStartX + 2.5*32, cuadradoStartY - 2.5*32, bloqueIdCounter++, 'champinon');
             let bloquePregunta2 = bpObj2.getSprite();
             bloques.add(bloquePregunta2);
             bloquesPregunta.push(bloquePregunta2);
             
-            
-            for (let i = 0; i < 2; i++) {
-                const bObj = new BloqueRompible(this, 932 + i*32, 320, bloqueIdCounter++);
-                let bloque = bObj.getSprite();
-                bloques.add(bloque);
-                bloquesRompibles.push(bloque);
+            // Tercera plataforma - Grupo 3: Escalera de 4 peldaños en el borde derecho
+            // Peldaños orientados hacia arriba-izquierda: filas desde arriba -> 1,2,3,4 bloques
+            // Calcular el borde real en píxeles de la tercera plataforma (tiles de 64px)
+            const thirdPlatformPixelWidth = Math.ceil(thirdWidth / 64) * 64;
+            const escaleraStartX = thirdStartX + thirdPlatformPixelWidth - 20; // X del bloque más a la derecha (centro del último tile)
+            const escaleraBaseY = 520; // Y base de la escalera (alineado con la parte superior del suelo)
+            // Iterar por filas desde arriba (row=0) a abajo (row=3)
+            for (let row = 0; row < 4; row++) {
+                const blocksInRow = row + 1; // 1,2,3,4
+                // Calcular Y: la fila superior está a escaleraBaseY - 3*32
+                const y = escaleraBaseY - (3 - row) * 32;
+                for (let i = 0; i < blocksInRow; i++) {
+                    // Colocar bloques extendiéndose hacia la izquierda desde el borde
+                    const x = escaleraStartX - i * 32;
+                    const bObj = new Bloque(this, x, y, bloqueIdCounter++);
+                    let bloque = bObj.getSprite();
+                    bloques.add(bloque);
+                }
             }
             
-            // Grupo 4: Plataforma alta
-            for (let i = 0; i < 4; i++) {
-                const bObj = new Bloque(this, 1400 + i*32, 250, bloqueIdCounter++);
-                let bloque = bObj.getSprite();
-                bloques.add(bloque);
+            // Cuarta plataforma - Escalera de 4 peldaños espejada al principio
+            const fourthPlatformStartX = thirdStartX + thirdWidth + 100;
+            const escaleraEspejadaStartX = fourthPlatformStartX + 65;
+            const escaleraEspejadaBaseY = 520;
+            for (let escalon = 0; escalon < 4; escalon++) {
+                // Escalera espejada: peldaño más alto tiene más bloques
+                const peldanoActual = 3 - escalon; // Invertir orden
+                for (let col = 0; col <= peldanoActual; col++) {
+                    const bObj = new Bloque(this, escaleraEspejadaStartX + col*32, escaleraEspejadaBaseY - escalon*32, bloqueIdCounter++);
+                    let bloque = bObj.getSprite();
+                    bloques.add(bloque);
+                }
             }
-            
-            // Grupo 5: Bloques finales
-            const bpObj3 = new BloquePregunta(this, 1800, 350, bloqueIdCounter++, 'champinon');
-            let bloquePregunta3 = bpObj3.getSprite();
-            bloques.add(bloquePregunta3);
-            bloquesPregunta.push(bloquePregunta3);
-            
             
         } else {
             // NIVEL 2 (DIFÍCIL): Bloques más dispersos y difíciles de alcanzar
@@ -843,6 +940,24 @@ function Juego() {
                 tubos.add(sprite);
             });
         });
+
+        // Añadir dos bloques de pregunta encima de la tercera tubería (índice 2)
+        try {
+            if (listaTuberias[2]) {
+                const tubo3X = datosTubos[2].x;
+                const preguntasY = 300; // altura donde se colocan los bloques
+                // Colocar los dos bloques juntos, centrados sobre la tubería
+                const bpOver1 = new BloquePregunta(this, tubo3X - 16, preguntasY, bloqueIdCounter++, 'moneda');
+                let bloquePreguntaOver1 = bpOver1.getSprite();
+                bloques.add(bloquePreguntaOver1);
+                bloquesPregunta.push(bloquePreguntaOver1);
+
+                const bpOver2 = new BloquePregunta(this, tubo3X + 16, preguntasY, bloqueIdCounter++, 'champinon');
+                let bloquePreguntaOver2 = bpOver2.getSprite();
+                bloques.add(bloquePreguntaOver2);
+                bloquesPregunta.push(bloquePreguntaOver2);
+            }
+        } catch (e) { /* no crítico */ }
         
         // === PLANTAS PIRAÑA (rojas con verde) ===
         plantasPirana = [];
@@ -880,25 +995,9 @@ function Juego() {
             }
         });
         
-        // === ESCALERAS (amarillas) ===
+        // === ESCALERAS (eliminadas - no tienen textura) ===
         escaleras = this.physics.add.staticGroup();
-        
-        let posicionesEscaleras = [];
-        if (numero === 1) {
-            // NIVEL 1: Escaleras más frecuentes
-            posicionesEscaleras = [600, 1150, 1750, 2150];
-        } else {
-            // NIVEL 2: Menos escaleras
-            posicionesEscaleras = [650, 1450, 2050];
-        }
-        
-        posicionesEscaleras.forEach(x => {
-            for (let i = 0; i < 4; i++) {
-                let escalon = this.add.rectangle(x + i*25, 536 - i*25, 25, 25, 0xDAA520);
-                this.physics.add.existing(escalon, true);
-                escaleras.add(escalon);
-            }
-        });
+        // Las escaleras han sido reemplazadas por bloques normales en forma de escalera
         
         // === MONEDAS (amarillo brillante) ===
         monedas = [];
@@ -906,12 +1005,15 @@ function Juego() {
         
         if (numero === 1) {
             // NIVEL 1: Más monedas y más accesibles
-            monedas.push(...Moneda.crearLinea(this, 300, 360, 4, 32, monedaId));
-            monedaId += 4;
-            monedas.push(...Moneda.crearLinea(this, 800, 300, 5, 32, monedaId));
+            // Primera fila de monedas ahora encima de la fila de bloques rompibles
+            monedas.push(...Moneda.crearLinea(this, breakableRowStartX, breakableRowY - 40, 3, 32, monedaId));
+            monedaId += 3;
+            monedas.push(...Moneda.crearLinea(this, 840, 300, 5, 32, monedaId));
             monedaId += 5;
-            monedas.push(...Moneda.crearLinea(this, 1350, 440, 6, 32, monedaId));
-            monedaId += 6;
+            // Fila de monedas sobre el primer hueco entre primera y segunda plataforma
+            const gapCenterX = Math.round(((baseWidth + secondStartX) / 2) - 56); // centrar en el hueco
+            monedas.push(...Moneda.crearLinea(this, gapCenterX, 470, 5, 32, monedaId));
+            monedaId += 5;
             monedas.push(...Moneda.crearLinea(this, 1800, 310, 4, 32, monedaId));
             monedaId += 4;
         } else {
@@ -935,7 +1037,9 @@ function Juego() {
             // Nivel 1 (Fácil): pocos enemigos
             posicionesGoombas = [
                 {x: 400, y: 500},
-                {x: 1400, y: 500}
+                {x: 1400, y: 500},
+                // Nueva posición: entre la 4ª (x=1650) y 5ª tubería (x=2050)
+                {x: 1750, y: 500}
             ];
         } else {
             // Nivel 2 (Difícil): más enemigos
@@ -958,11 +1062,16 @@ function Juego() {
         
         // Crear Koopas distribuidos por el nivel usando la clase
         let posicionesKoopas = [];
-        if (numero === 1) {
-            // Nivel 1 (Fácil): pocos Koopas
+            if (numero === 1) {
+            // Nivel 1 (Fácil): Koopas incluyendo uno dentro del cuadrado de bloques rompibles
+            // Recalcular el inicio real del cuadrado (coincide con la creación anterior)
+            const cuadradoStartX = thirdStartX + 280;
+            const cuadradoStartY = 350;
             posicionesKoopas = [
                 {x: 800, y: 500},
-                {x: 1500, y: 500}
+                // Koopa entre la 4ª y 5ª tubería
+                {x: 1850, y: 500},
+                {x: cuadradoStartX + 2.5 * 32, y: cuadradoStartY - 2.5 * 32} // Koopa dentro del cuadrado (centro)
             ];
         } else {
             // Nivel 2 (Difícil): más Koopas
@@ -1012,7 +1121,8 @@ function Juego() {
         });
 
         // === BANDERA DE META (al final del nivel) ===
-        let metaX = numero === 1 ? 4300 : 2300; // Nivel 1 termina alrededor de x=4300
+        // Para nivel 1, colocar al final de la cuarta plataforma
+        let metaX = numero === 1 ? (fourthStartX + fourthWidth - 100) : 2300;
         let metaY = 568;
         
         // Bandera de meta (clase Bandera)
@@ -1077,6 +1187,25 @@ function Juego() {
         this.physics.add.collider(caparazonesGroup, bloques);
         this.physics.add.collider(caparazonesGroup, tubos);
         this.physics.add.collider(caparazonesGroup, escaleras);
+
+        // Colisiones con paredes invisibles del mundo (si existen)
+        try {
+            const walls = this._worldWalls || {};
+            if (walls.left) {
+                this.physics.add.collider(player, walls.left);
+                this.physics.add.collider(goombas, walls.left);
+                this.physics.add.collider(koopas, walls.left);
+                this.physics.add.collider(caparazonesGroup, walls.left);
+                this.physics.add.collider(champinones, walls.left);
+            }
+            if (walls.right) {
+                this.physics.add.collider(player, walls.right);
+                this.physics.add.collider(goombas, walls.right);
+                this.physics.add.collider(koopas, walls.right);
+                this.physics.add.collider(caparazonesGroup, walls.right);
+                this.physics.add.collider(champinones, walls.right);
+            }
+        } catch (e) {}
         
         // Colisión entre Goombas y Koopas
         this.physics.add.collider(goombas, koopas);
@@ -1431,6 +1560,8 @@ function Juego() {
                     bloque.roto = true;
                     bloque.visible = false;
                     bloque.body.enable = false;
+                    // Generar fragmentos visuales localmente para mostrar la ruptura
+                    try { createBlockFragments(bloque); } catch(e) {}
                     console.log("Bloque", datos.bloqueId, "roto y sincronizado");
                 }
             });
@@ -1872,33 +2003,38 @@ function Juego() {
     }
     
     // Función para romper bloque
+    // Crear fragmentos visuales para la ruptura de un bloque (no envía WS)
+    function createBlockFragments(bloque) {
+        try {
+            for (let i = 0; i < 4; i++) {
+                let fragmento = game.scene.scenes[0].add.rectangle(
+                    bloque.x + (i % 2) * 8 - 4,
+                    bloque.y + Math.floor(i / 2) * 8 - 4,
+                    8, 8, 0xCC6600
+                );
+                game.scene.scenes[0].physics.add.existing(fragmento);
+                fragmento.body.setVelocity(
+                    (Math.random() - 0.5) * 200,
+                    -200 - Math.random() * 100
+                );
+                fragmento.body.setGravityY(800);
+                setTimeout(() => { try { fragmento.destroy(); } catch(e){} }, 1000);
+            }
+        } catch (e) {}
+    }
+
     function romperBloque(bloque) {
         if (bloque.roto) return;
-        
+
         bloque.roto = true;
         bloque.visible = false;
         bloque.body.enable = false;
-        
+
         console.log("¡Bloque roto! ID:", bloque.id);
-        
-        // Efecto visual de fragmentos (4 cuadraditos que vuelan)
-        for (let i = 0; i < 4; i++) {
-            let fragmento = game.scene.scenes[0].add.rectangle(
-                bloque.x + (i % 2) * 8 - 4,
-                bloque.y + Math.floor(i / 2) * 8 - 4,
-                8, 8, 0xCC6600 // Mismo color que el bloque rompible
-            );
-            game.scene.scenes[0].physics.add.existing(fragmento);
-            fragmento.body.setVelocity(
-                (Math.random() - 0.5) * 200,
-                -200 - Math.random() * 100
-            );
-            fragmento.body.setGravityY(800);
-            
-            // Eliminar fragmento después de 1 segundo
-            setTimeout(() => fragmento.destroy(), 1000);
-        }
-        
+
+        // Crear fragmentos visuales localmente
+        try { createBlockFragments(bloque); } catch (e) {}
+
         // Sincronizar con otros jugadores
         ws.enviarBloqueRoto({
             codigo: codigo,
