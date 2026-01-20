@@ -1,0 +1,355 @@
+/* Estilos personalizados para la aplicación */
+
+/* Fondo de pantalla principal con diseño estilo Mario/Wonder Alien */
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: transparent;
+}
+
+/* Contenedor principal que cubre toda la pantalla */
+#mainContent {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1;
+}
+
+/* Si el usuario proporciona su propia imagen personalizada: aplicable a #mainContent */
+#mainContent.custom-bg, .custom-bg {
+    background-image: url('./img/wonder_alien_2_mejorada.jpg');
+    background-size: cover;
+    background-position: top center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+/* Modal de login personalizado */
+#modalLogin .modal-dialog {
+    max-width: 450px;
+    margin-top: 2.2vh; /* acercar el modal hacia arriba */
+    z-index: 1051;
+}
+
+#modalLogin .modal-content {
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    background: rgba(255, 255, 255, 0.98);
+    z-index: 1051;
+}
+
+#modalLogin {
+    z-index: 1050;
+}
+
+.modal-backdrop {
+    z-index: 1049 !important;
+}
+
+#modalLogin .modal-header {
+    background: transparent;
+    color: #007bff; /* Bootstrap blue for titles */
+    border-bottom: none;
+    border-radius: 15px 15px 0 0;
+    padding-bottom: 4px; /* aún menos separación hacia el body */
+    padding-top: 8px;
+}
+
+#modalLogin .modal-body {
+    padding: 12px 24px 18px; /* compactar aún más el espacio interior */
+}
+
+/* Mensaje de bienvenida temporal */
+.mensaje-bienvenida {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    padding: 30px 60px;
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    animation: fadeInOut 3s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+}
+
+/* Contenedor principal centrado - ajustado para bajar el botón */
+.contenedor-central {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 56px); /* Altura viewport - navbar */
+    padding: 20px;
+    padding-top: 200px; /* Bajar el contenido un poco más */
+}
+
+/* Botón de jugar - tamaño reducido y azul (estilo Bootstrap) - estilo plano */
+.btn-jugar {
+    padding: 15px 50px;
+    font-size: 1.8rem;
+    font-weight: 700;
+    border-radius: 14px;
+    background: #007bff;
+    border: none;
+    color: white;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.28);
+    transition: all 0.18s ease;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-jugar img {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+}
+
+.btn-jugar:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.36);
+    background: #0056b3;
+}
+
+/* Responsive: botón aún más compacto en móviles */
+@media (max-width: 576px) {
+    .contenedor-central { padding-top: 120px; }
+    .btn-jugar { padding: 12px 28px; font-size: 1.2rem; letter-spacing: 1px; }
+    .btn-jugar img { width: 36px; height: 36px; }
+}
+
+.btn-jugar:active {
+    transform: scale(1.05);
+}
+
+/* Fondo para la sección de partidas */
+.fondo-partidas {
+    background: #ffffff;
+    min-height: 100vh;
+    padding: 40px 0;
+    position: relative;
+}
+
+/* Cards de partidas mejoradas */
+.card-partida {
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease;
+}
+
+.card-partida:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+
+/* Overlay oscuro para cuando se muestra el modal */
+.overlay-oscuro {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1040;
+    display: none;
+}
+
+.overlay-oscuro.active {
+    display: block;
+}
+
+/* Navbar totalmente transparente y posicionado encima */
+.navbar-custom {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #fff;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: none !important;
+    transition: background 0.3s ease;
+}
+
+/* Navbar con fondo oscuro cuando se muestra la sección de partidas */
+.navbar-custom.navbar-partidas {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+}
+
+/* Regla más específica para forzar fondo y texto en el navbar (alta prioridad) */
+nav#mainNavbar.navbar-custom.navbar-partidas {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%) !important;
+    background-image: linear-gradient(135deg, #34495e 0%, #2c3e50 100%) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12) !important;
+    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+}
+
+/* Texto y botones en blanco cuando el navbar está en modo partidas */
+.navbar-custom.navbar-partidas .navbar-text,
+.navbar-custom.navbar-partidas .nav-link,
+.navbar-custom.navbar-partidas .navbar-brand,
+.navbar-custom.navbar-partidas .btn {
+    color: #ffffff !important;
+}
+
+.navbar-custom.navbar-partidas .btn {
+    background-color: rgba(255,255,255,0.08) !important;
+    border-color: rgba(255,255,255,0.12) !important;
+}
+
+.navbar-custom.navbar-dark {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+/* Email del usuario en azul oscuro */
+#nombreUsuario {
+    color: #1e3a8a;
+    font-weight: 600;
+}
+
+/* Email del usuario en blanco cuando navbar está en modo partidas */
+.navbar-partidas #nombreUsuario {
+    color: #ffffff;
+}
+
+/* Contenedor de juego */
+#juegoContainer {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 15px;
+}
+
+/* Estilos para formularios dentro del modal */
+.form-control {
+    border-radius: 10px;
+    border: 2px solid #ddd;
+    padding: 12px;
+}
+
+.form-control:focus {
+    border-color: #e74c3c;
+    box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
+}
+
+/* Botones personalizados */
+.btn-primary-custom {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 30px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+}
+
+/* Link de cambio entre login y registro */
+.link-cambio {
+    color: #3498db;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.link-cambio:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .btn-jugar {
+        padding: 20px 50px;
+        font-size: 1.8rem;
+    }
+    
+    #modalLogin .modal-dialog {
+        margin: 3vh auto;
+    }
+}
+
+/* HUD icon used across UI (modal titles, headings, play button) */
+.icon-hud{
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+/* Separador pequeño entre Google sign-in y formulario */
+#separadorAuth {
+    margin: 6px 0 10px;
+    border: none;
+    height: 1px;
+    background: rgba(0,0,0,0.05);
+}
+
+/* Compactar márgenes de los grupos de formulario dentro del modal */
+#modalLogin .modal-body .form-group:first-child {
+    margin-top: 0;
+}
+#modalLogin .modal-body .form-group {
+    margin-bottom: 0.6rem; /* reducir separaciones entre campos */
+}
+/* Título de la sección partidas */
+.titulo-partidas {
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+/* Sprites de personajes en la sección partidas */
+.sprite-character {
+    position: fixed;
+    bottom: 0;
+    width: 200px;
+    height: auto;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.sprite-left {
+    left: 20px;
+}
+
+.sprite-right {
+    right: 20px;
+}
+
+@media (max-width: 768px) {
+    .sprite-character {
+        width: 120px;
+    }
+    
+    .sprite-left {
+        left: 10px;
+    }
+    
+    .sprite-right {
+        right: 10px;
+    }
+}

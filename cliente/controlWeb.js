@@ -1,312 +1,64 @@
 function ControlWeb(){
-    this.inicializarNavegacion=function(){
-        // Mostrar por defecto la sección de Inicio Sesión si no hay sesión
-        let nick = $.cookie("nick");
-        if (nick) {
-            cw.mostrarSeccion('seccionAcciones');
-        } else {
-            cw.mostrarSeccion('seccionInicioSesion');
-        }
-        
-        // Event listeners para los links de navegación
-        $("#linkInicioSesion").on("click", function(e){
-            e.preventDefault();
-            cw.mostrarSeccion('seccionInicioSesion');
-        });
-        
-        $("#linkAcciones").on("click", function(e){
-            e.preventDefault();
-            cw.mostrarSeccion('seccionAcciones');
-        });
-        
-        $("#linkPartidas").on("click", function(e){
-            e.preventDefault();
-            cw.mostrarSeccion('seccionPartidas');
-        });
-        
-        $("#linkAcercaDe").on("click", function(e){
-            e.preventDefault();
-            cw.mostrarSeccion('seccionAcercaDe');
-        });
-    }
     
-    this.mostrarSeccion=function(seccionId){
-        // Ocultar todas las secciones
-        $("#seccionInicioSesion").hide();
-        $("#seccionPartidas").hide();
-        $("#seccionAcciones").hide();
-        $("#seccionAcercaDe").hide();
-        
-        // Mostrar la sección solicitada
-        $("#" + seccionId).show();
-        
-        // Si vamos a la sección de inicio sesión, actualizar visibilidad según estado de sesión
-        if (seccionId === 'seccionInicioSesion') {
-            let nick = $.cookie("nick");
-            if (nick) {
-                // Hay sesión activa - ocultar elementos de autenticación
-                $("#tituloAutenticacion").hide();
-                $("#googleSignInContainer").hide();
-                $("#separadorAuth").hide();
-            } else {
-                // No hay sesión - mostrar elementos de autenticación
-                $("#tituloAutenticacion").show();
-                $("#googleSignInContainer").show();
-                $("#separadorAuth").show();
-            }
-        }
-        
-        // Actualizar clase active en navbar
-        $(".navbar-nav .nav-link").removeClass("active");
-        if (seccionId === 'seccionInicioSesion') {
-            $("#linkInicioSesion").addClass("active");
-        } else if (seccionId === 'seccionPartidas') {
-            $("#linkPartidas").addClass("active");
-            // Inicializar la sección de partidas
-            cw.inicializarPartidas();
-        } else if (seccionId === 'seccionAcciones') {
-            $("#linkAcciones").addClass("active");
-        } else if (seccionId === 'seccionAcercaDe') {
-            $("#linkAcercaDe").addClass("active");
-        }
-    }
-    
-    this.mostrarAgregarUsuario=function(){
-        let cadena = '<div class="card mb-3" id="mAU">';
-            cadena+=' <div class="card-body">';
-            cadena+='<h5 class="card-title">Agregar usuario</h5>';
-            cadena+='<div class="form-group">';
-            cadena+='<label for="nick">Nombre:</label>';
-            cadena+='<input id="nick" type="text" class="form-control">';
-            cadena+='</div>';
-            cadena+='<button id="btnAU" class="btn btn-primary btn-block">Enviar</button>';
-            cadena+='</div></div>';
-        $("#left-cards").append(cadena);
-        $("#btnAU").on("click", function(){
-            let nick=$("#nick").val();
-            $("#mAU .alert").remove();
-            if (!nick){
-                $("#mAU .card-body").append('<div class="alert alert-danger mt-2">Por favor introduce un nombre</div>');
-                return;
-            }
-            rest.agregarUsuario(nick);
-        });
-    }
-
-    this.mostrarObtenerUsuarios=function(){
-        $("#right-cards").append('<div class="card mb-3" id="mOU">'
-            +'<div class="card-body">'
-            +'<h5 class="card-title">Obtener usuarios</h5>'
-            +'<button id="btnOU" class="btn btn-secondary btn-block">Listar usuarios</button>'
-            +'<div class="mt-3">'
-            +'<table class="table table-sm table-striped" id="tablaUsuarios">'
-            +'<thead><tr><th>Nick</th></tr></thead>'
-            +'<tbody><tr><td><em>...</em></td></tr></tbody>'
-            +'</table>'
-            +'</div>'
-            +'</div></div>');
-        $("#btnOU").on('click', function(){
-            rest.obtenerUsuarios();
-        });
-    }
-
-    // Para llenar la tabla de susuarios
-    this.llenarTabla = function(data){
-        let tbody = $("#tablaUsuarios tbody");
-        tbody.html('');
-        if (!data || data.length === 0){
-            tbody.append('<tr><td><em>No hay usuarios</em></td></tr>');
-        }
-        else{
-            data.forEach(function(u){
-                var nick = u.nick;
-                tbody.append('<tr><td>'+nick+'</td></tr>');
-            });
-        }
-    }
-
-    this.mostrarNumeroUsuarios=function(){
-        $("#right-cards").append('<div class="card mb-3" id="mNU">'
-            +'<div class="card-body">'
-            +'<h5 class="card-title">Número de usuarios</h5>'
-            +'<button id="btnNU" class="btn btn-secondary btn-block">Mostrar número</button>'
-            +'</div></div>');
-        $("#btnNU").on('click', function(){
-            rest.numeroUsuarios();
-        });
-    }
-
-    this.mostrarUsuarioActivo=function(){
-        $("#left-cards").append('<div class="card mb-3" id="mUA">'
-            +'<div class="card-body">'
-            +'<h5 class="card-title">Comprobar usuario activo</h5>'
-            +'<div class="form-group">'
-            +'<label for="nickAct">Nombre:</label>'
-            +'<input id="nickAct" type="text" class="form-control">'
-            +'</div>'
-            +'<button id="btnUA" class="btn btn-secondary btn-block">Comprobar</button>'
-            +'</div></div>');
-        $("#btnUA").on('click', function(){
-            let nick = $("#nickAct").val();
-            $("#mUA .alert").remove();
-            if (!nick){
-                $("#mUA .card-body").append('<div class="alert alert-danger mt-2">Por favor introduce un nombre</div>');
-                return;
-            }
-            rest.usuarioActivo(nick);
-        });
-    }
-
-    this.mostrarEliminarUsuario=function(){
-        $("#left-cards").append('<div class="card mb-3" id="mEU">'
-            +'<div class="card-body">'
-            +'<h5 class="card-title">Eliminar usuario</h5>'
-            +'<div class="form-group">'
-            +'<label for="nickDel">Nombre:</label>'
-            +'<input id="nickDel" type="text" class="form-control">'
-            +'</div>'
-            +'<button id="btnEU" class="btn btn-danger btn-block">Eliminar</button>'
-            +'</div></div>');
-        $("#btnEU").on('click', function(){
-            let nick = $("#nickDel").val();
-            $("#mEU .alert").remove();
-            if (!nick){
-                $("#mEU .card-body").append('<div class="alert alert-danger mt-2">Por favor introduce un nombre</div>');
-                return;
-            }
-            rest.eliminarUsuario(nick);
-        });
-    }
-
-    this.mostrarBienvenida=function(msg){
-        $("#mensajes").html('<div class="alert alert-info mt-2 d-flex justify-content-between align-items-center">'+
-            '<span>'+msg+'</span>'+
-            '<button id="btnSalir" class="btn btn-light btn-sm ml-3">Salir</button>'+
-        '</div>');
-        $("#btnSalir").on("click", function(){
+    // Nueva función de inicialización
+    this.inicializar=function(){
+        // Configurar eventos del navbar
+        $("#linkSalir").on("click", function(e){
+            e.preventDefault();
             cw.salir();
         });
+        
+        // Configurar botón de jugar
+        $("#btnJugar").on("click", function(){
+            cw.mostrarSeccionPartidas();
+        });
+        
+        // Comprobar sesión al cargar
+        cw.comprobarSesion();
     }
-
+    
     this.comprobarSesion=function(){
         let nick = $.cookie("nick");
         if (nick){
-            cw.mostrarBienvenida("Bienvenido al sistema, "+nick);
-            cw.mostrarSeccion('seccionPartidas');
+            // Hay sesión activa - mostrar pantalla de inicio con botón de jugar
+            cw.mostrarPantallaInicio(nick);
         }
         else{
-            // Mostrar login por defecto cuando no hay sesión
-            cw.mostrarLogin();
-            cw.mostrarSeccion('seccionInicioSesion');
+            // No hay sesión - mostrar modal de login
+            cw.mostrarModalLogin();
         }
     }
-
-    this.salir=function(){
-        $.removeCookie("nick");
-        rest.cerrarSesion();
-        cw.mostrarMensaje("Has salido del sistema correctamente", "info");
-        // Redirigir a la sección de inicio de sesión
-        setTimeout(function(){
-            location.reload();
-        }, 1000);
+    
+    this.mostrarModalLogin=function(){
+        // Cargar formulario de login en el modal
+        cw.cargarFormularioLogin();
+        // Mostrar el modal
+        $("#modalLogin").modal('show');
     }
-
-    this.mostrarSalir=function(){
-        // Función obsoleta - ahora el botón se crea en mostrarBienvenida
-    }
-
-    this.mostrarRegistro=function(){ 
-        $("#fmRegistro").remove();
-        $("#fmLogin").remove(); // Ocultar el formulario de login
-        $("#login").html(''); // Limpiar el contenedor de login
-        
-        $("#registro").load("./cliente/registro.html",function(){ 
-            // Usar delegación de eventos
-            $(document).off("click", "#btnRegistro").on("click", "#btnRegistro", function(e){ 
-                e.preventDefault(); 
-                
-                // Limpiar alertas previas
-                $("#fmRegistro .alert").remove();
-                
-                let email=$("#email").val().trim(); 
-                let pwd=$("#pwd").val(); 
-                let nombre=$("#nombre").val().trim();
-                let apellidos = $("#apellidos").val().trim();
-                
-                if (!email || !pwd){ 
-                    $("#fmRegistro").append('<div class="alert alert-danger mt-2">Por favor completa todos los campos</div>');
-                    return;
-                }
-                
-                rest.registrarUsuario(email, pwd, nombre, apellidos); 
-                console.log("Intentando registrar:", email, nombre, apellidos); 
-            });
-            
-            // Link para mostrar login desde el registro con delegación de eventos
-            $(document).off("click", "#linkLogin").on("click", "#linkLogin", function(e){
-                e.preventDefault();
-                console.log("Click en linkLogin detectado");
-                cw.mostrarLogin();
-            });
-        }); 
- 
-    }
-
-    this.mostrarLogin=function(){ 
-        $("#fmLogin").remove();
-        $("#fmRegistro").remove(); // Ocultar el formulario de registro
-        $("#registro").html(''); // Limpiar el contenedor de registro
-        
-        // Si hay sesión activa en la sección de inicio sesión, mostrar botón de salir
-        let nick = $.cookie("nick");
-        if (nick) {
-            // Ocultar título, botón de Google y separador
-            $("#tituloAutenticacion").hide();
-            $("#googleSignInContainer").hide();
-            $("#separadorAuth").hide();
-            
-            $("#login").html('<div class="text-center mt-5">'+
-                '<div class="card mx-auto" style="max-width: 400px;">'+
-                '<div class="card-body">'+
-                '<h5 class="card-title">Sesión activa</h5>'+
-                '<p class="card-text">Has iniciado sesión como:</p>'+
-                '<h6 class="text-primary mb-4">'+nick+'</h6>'+
-                '<button id="btnSalirLogin" class="btn btn-danger btn-lg btn-block">Cerrar Sesión</button>'+
-                '</div>'+
-                '</div>'+
-            '</div>');
-            $("#btnSalirLogin").on("click", function(){
-                cw.salir();
-            });
-            return;
-        }
-        
-        // Si no hay sesión, mostrar todo
-        $("#tituloAutenticacion").show();
-        $("#googleSignInContainer").show();
-        $("#separadorAuth").show();
-        
-        $("#login").load("./cliente/login.html",function(){ 
-            // Usar delegación de eventos para manejar clicks en botones/enlaces cargados dinámicamente
+    
+    this.cargarFormularioLogin=function(){
+        $("#tituloModal").html('<img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud"> Wonder Alien - Inicio de Sesión');
+        $("#contenedorFormulario").load("./cliente/login.html", function(){
+            // Configurar eventos del formulario de login
             $(document).off("click", "#btnLogin").on("click", "#btnLogin", function(e){ 
                 e.preventDefault(); 
                 
                 // Limpiar alertas previas
-                $("#fmLogin .alert").remove();
+                $("#notificacionesModal .alert").remove();
                 
                 let email=$("#emailLogin").val().trim(); 
                 let pwd=$("#pwdLogin").val(); 
                 
                 // Validaciones
                 if (!email || !pwd){ 
-                    cw.mostrarMensaje("Por favor completa todos los campos", "danger");
+                    cw.mostrarMensajeModal("Por favor completa todos los campos", "danger");
                     return;
                 }
                 
                 // Validar formato de email
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(email)) {
-                    cw.mostrarMensaje("Por favor introduce un email válido", "danger");
+                    cw.mostrarMensajeModal("Por favor introduce un email válido", "danger");
                     return;
                 }
                 
@@ -315,14 +67,180 @@ function ControlWeb(){
                 console.log("Intentando iniciar sesión:", email); 
             });
             
-            // Link para mostrar registro desde el login con delegación de eventos
+            // Link para mostrar registro desde el login
             $(document).off("click", "#linkRegistro").on("click", "#linkRegistro", function(e){
                 e.preventDefault();
-                console.log("Click en linkRegistro detectado");
-                cw.mostrarRegistro();
+                console.log("Cambiar a formulario de registro");
+                cw.cargarFormularioRegistro();
             });
-        }); 
- 
+        });
+    }
+    
+    this.cargarFormularioRegistro=function(){
+        $("#tituloModal").html('<img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud"> Wonder Alien - Registro');
+        $("#contenedorFormulario").load("./cliente/registro.html", function(){
+            // Configurar eventos del formulario de registro
+            $(document).off("click", "#btnRegistro").on("click", "#btnRegistro", function(e){ 
+                e.preventDefault(); 
+                
+                // Limpiar alertas previas
+                $("#notificacionesModal .alert").remove();
+                
+                let email=$("#email").val().trim(); 
+                let pwd=$("#pwd").val(); 
+                let nombre=$("#nombre").val().trim();
+                let apellidos = $("#apellidos").val().trim();
+                
+                if (!email || !pwd){ 
+                    cw.mostrarMensajeModal("Por favor completa todos los campos", "danger");
+                    return;
+                }
+                
+                rest.registrarUsuario(email, pwd, nombre, apellidos); 
+                console.log("Intentando registrar:", email, nombre, apellidos); 
+            });
+            
+            // Link para volver al login desde el registro
+            $(document).off("click", "#linkLogin").on("click", "#linkLogin", function(e){
+                e.preventDefault();
+                console.log("Cambiar a formulario de login");
+                cw.cargarFormularioLogin();
+            });
+        });
+    }
+    
+    this.mostrarMensajeModal=function(mensaje, tipo){
+        if (!tipo) tipo = 'info';
+        
+        $("#notificacionesModal .alert").remove();
+        $("#notificacionesModal").html(`
+            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                ${mensaje}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        `);
+    }
+    
+    this.cerrarModalLogin=function(){
+        $("#modalLogin").modal('hide');
+    }
+    
+    this.mostrarPantallaInicio=function(nick){
+        // Ocultar modal si está abierto
+        cw.cerrarModalLogin();
+        
+        // Mostrar navbar
+        $("#mainNavbar").show();
+        $("#nombreUsuario").html(nick);
+        
+        // Restaurar navbar a estado transparente por defecto
+        $(".navbar-custom").removeClass("navbar-partidas").css({
+            background: 'transparent',
+            boxShadow: 'none'
+        });
+        $("#nombreUsuario").css('color', '#1e3a8a');
+
+        // Ocultar sección de partidas
+        $("#seccionPartidas").hide();
+        
+        // Mostrar pantalla de inicio con botón de jugar
+        $("#pantallaInicio").show();
+    }
+    
+    this.mostrarBienvenidaTemporal=function(email){
+        $("#mensajeBienvenida").html("¡Bienvenido al sistema, " + email + "!").fadeIn();
+        
+        setTimeout(function(){
+            $("#mensajeBienvenida").fadeOut(function(){
+                // Después de ocultar el mensaje, mostrar la pantalla de inicio
+                cw.mostrarPantallaInicio($.cookie("nick"));
+            });
+        }, 3000);
+    }
+    
+    this.mostrarSeccionPartidas=function(){
+        // Ocultar pantalla de inicio
+        $("#pantallaInicio").hide();
+        
+        // Cambiar el fondo del contenedor principal (quitar la imagen de fondo)
+        $("#mainContent").removeClass("custom-bg").addClass("fondo-partidas");
+        
+        // Activar modo partidas en navbar (fondo azul oscuro)
+        $(".navbar-custom").addClass("navbar-partidas");
+        // Asegurar que las reglas se apliquen aunque haya otras declaraciones con !important
+        $(".navbar-custom").css({
+            background: 'linear-gradient(135deg, #34495e 0%, #2c3e50 100%)',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+        });
+        $("#nombreUsuario").css('color', '#ffffff');
+        
+        // Mostrar sección de partidas
+        $("#seccionPartidas").show();
+        
+        // Inicializar partidas
+        cw.inicializarPartidas();
+    }
+    
+    this.salir=function(){
+        $.removeCookie("nick");
+        rest.cerrarSesion();
+        
+        // Recargar la página para volver al estado inicial
+        location.reload();
+    }
+
+    // Funciones heredadas del código original (adaptadas)
+    
+    this.inicializarNavegacion=function(){
+        // Función obsoleta - mantenida por compatibilidad
+    }
+    
+    this.mostrarSeccion=function(seccionId){
+        // Función obsoleta - mantenida por compatibilidad
+    }
+    
+    this.mostrarAgregarUsuario=function(){
+        // Función obsoleta - eliminada del nuevo diseño
+    }
+
+    this.mostrarObtenerUsuarios=function(){
+        // Función obsoleta - eliminada del nuevo diseño
+    }
+
+    this.llenarTabla = function(data){
+        // Función obsoleta - eliminada del nuevo diseño
+    }
+
+    this.mostrarNumeroUsuarios=function(){
+        // Función obsoleta - eliminada del nuevo diseño
+    }
+
+    this.mostrarUsuarioActivo=function(){
+        // Función obsoleta - eliminada del nuevo diseño
+    }
+
+    this.mostrarEliminarUsuario=function(){
+        // Función obsoleta - eliminada del nuevo diseño
+    }
+
+    this.mostrarBienvenida=function(msg){
+        // Función obsoleta - reemplazada por mostrarPantallaInicio
+    }
+
+    this.mostrarSalir=function(){
+        // Función obsoleta
+    }
+
+    this.mostrarRegistro=function(){
+        // Ahora se usa cargarFormularioRegistro
+        cw.cargarFormularioRegistro();
+    }
+
+    this.mostrarLogin=function(){
+        // Ahora se usa cargarFormularioLogin
+        cw.cargarFormularioLogin();
     }
 
     this.limpiar=function(){
@@ -331,15 +249,14 @@ function ControlWeb(){
         $("#nombre").val('');
         $("#apellidos").val('');
         
-        $("#fmRegistro .alert").remove();
+        $("#notificacionesModal .alert").remove();
     }
 
     this.limpiarLogin=function(){
         $("#emailLogin").val('');
         $("#pwdLogin").val('');
         
-        $("#fmLogin .alert").remove();
-        $("#fmLogin").hide();
+        $("#notificacionesModal .alert").remove();
     }
 
     this.mostrarMensaje=function(mensaje, tipo){
@@ -468,7 +385,7 @@ function ControlWeb(){
                 <p class="mb-3">¡Ambos jugadores conectados!</p>
                 ${selectorNivel}
                 <button id="btnIniciarJuego" class="btn btn-primary btn-lg">
-                    🎮 Iniciar Juego
+                    <img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud"> Iniciar Juego
                 </button>
                 <div id="estadoEspera" style="display:none; margin-top: 15px;">
                     <p class="text-info"><strong>Esperando a que el otro jugador esté listo...</strong></p>
