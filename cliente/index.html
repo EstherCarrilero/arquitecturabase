@@ -34,6 +34,10 @@
 
         <!-- Navbar transparente -->
         <nav class="navbar navbar-expand-sm navbar-dark navbar-custom" id="mainNavbar" style="display: none;">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud-navbar">
+                <span class="brand-text">Wonder Alien</span>
+            </a>
             <!-- Links -->
             <ul class="navbar-nav ml-auto w-100 justify-content-end align-items-center">
                 <li class="nav-item mr-3">
@@ -100,7 +104,7 @@
             <!-- Sección Partidas (oculta inicialmente) -->
             <div id="seccionPartidas" class="fondo-partidas" style="display:none;">
                 <div class="container">
-                    <h2 class="text-center mb-4 mt-4 titulo-partidas"><img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud"> Partidas Multijugador</h2>
+                    <!-- Heading removed as requested -->
                 
                     <!-- Cards de crear/unirse -->
                     <div id="cardsPartidas">
@@ -125,6 +129,14 @@
                                         <h5 class="mb-0">Partidas Disponibles</h5>
                                     </div>
                                     <div class="card-body">
+                                        <div class="mb-3">
+                                            <div class="input-group">
+                                                <div class="input-group-prepend">
+                                                    <span class="input-group-text">Código</span>
+                                                </div>
+                                                <input type="text" id="filtroCodigo" class="form-control" placeholder="Filtrar por código de partida (ej: ABC123)">
+                                            </div>
+                                        </div>
                                         <div id="listaPartidas"></div>
                                     </div>
                                 </div>
@@ -145,10 +157,7 @@
                     <!-- Contenedor del juego Phaser (oculto inicialmente) -->
                     <div id="juegoContainer" style="display:none;">
                         <div class="card">
-                            <div class="card-header bg-success text-white">
-                                <h4><img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud"> Mario Bros 2D - Partida en curso</h4>
-                            </div>
-                            <div class="card-body text-center">
+                            <div class="card-body text-center py-3">
                                 <div id="game"></div>
                                 <button id="btnSalirJuego" class="btn btn-danger mt-3">Salir del Juego</button>
                             </div>

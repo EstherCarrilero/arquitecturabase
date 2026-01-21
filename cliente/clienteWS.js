@@ -52,6 +52,7 @@ function ClienteWS(){
     this.enviarPuntuacion=function(datos){
         // Enviar puntuación del jugador al servidor
         if (datos && datos.codigo) {
+            // datos may include both `puntuacion` (monedas) and `puntos` (puntos totales)
             this.socket.emit("puntuacionJugador", datos);
         }
     }
@@ -87,6 +88,7 @@ function ClienteWS(){
     this.enviarChampinonRecogido=function(datos){
         // Enviar ID de champiñón recogido al servidor
         if (datos && datos.codigo && datos.champinonId !== undefined) {
+            try { console.log('Emitiendo recogerChampinon ->', datos); } catch(e) {}
             this.socket.emit("recogerChampinon", datos);
         }
     }
@@ -108,6 +110,7 @@ function ClienteWS(){
     this.enviarVidas=function(datos){
         // Enviar vidas del jugador al servidor
         if (datos && datos.codigo !== undefined && datos.vidas !== undefined) {
+            try { console.log('Emitiendo actualizarVidas ->', datos); } catch(e) {}
             this.socket.emit("actualizarVidas", datos);
         }
     }
@@ -123,6 +126,23 @@ function ClienteWS(){
         // Notificar al servidor que el jugador llegó a la meta
         if (datos && datos.codigo) {
             this.socket.emit("jugadorLlegoMeta", datos);
+        }
+    }
+
+    this.enviarVictoriaTimeout = function(datos) {
+        // Notificar al servidor que el timeout de victoria se ha disparado
+        if (datos && datos.codigo) {
+            try { console.log('Enviando victoriaTimeout ->', datos); } catch(e) {}
+            this.socket.emit("victoriaTimeout", datos);
+        }
+    }
+    
+    this.enviarGameOverExit = function(codigo) {
+        // Notificar al servidor que un jugador salió del Game Over
+        // El servidor debe eliminar la partida y expulsar a ambos jugadores
+        if (codigo) {
+            this.socket.emit("gameOverExit", {codigo: codigo});
+            console.log("Evento gameOverExit enviado al servidor");
         }
     }
     
@@ -206,13 +226,64 @@ function ClienteWS(){
     
     this.socket.on("partidaEliminada",function(datos){
         console.log("Partida eliminada:", datos.mensaje);
+        
+        // Destruir el juego si está activo
+        if (window.juego) {
+            try {
+                window.juego.destruir();
+                window.juego = null;
+                console.log("Juego destruido tras partida eliminada");
+            } catch (e) {
+                console.warn("Error al destruir juego:", e);
+            }
+        }
+        
+        // Ocultar el contenedor del juego
+        $("#juegoContainer").hide();
+        // Limpiar canvas residual
+        try { $("#game").empty(); } catch(e) { console.warn('No se pudo limpiar #game:', e); }
+        
         // Limpiar el estado y mostrar mensaje
         cw.mostrarMensaje(datos.mensaje, "warning");
+        
         // Volver a mostrar los cards
         $("#cardsPartidas").show();
         $("#estadoPartidaActual").hide();
         $("#estadoPartida").html("");
         ws.codigo = undefined;
+        
+        // Solicitar lista actualizada
+        ws.solicitarLista();
+    });
+    
+    this.socket.on("gameOverExit",function(datos){
+        console.log("Game Over Exit recibido - volviendo al menú de partidas");
+        
+        // Destruir el juego si está activo
+        if (window.juego) {
+            try {
+                window.juego.destruir();
+                window.juego = null;
+                console.log("Juego destruido tras Game Over Exit");
+            } catch (e) {
+                console.warn("Error al destruir juego:", e);
+            }
+        }
+        
+        // Ocultar el contenedor del juego
+        $("#juegoContainer").hide();
+        // Limpiar canvas residual
+        try { $("#game").empty(); } catch(e) { console.warn('No se pudo limpiar #game:', e); }
+        
+        // Limpiar el estado y mostrar mensaje
+        cw.mostrarMensaje("La partida ha terminado. Volviendo al menú de partidas...", "info");
+        
+        // Volver a mostrar los cards
+        $("#cardsPartidas").show();
+        $("#estadoPartidaActual").hide();
+        $("#estadoPartida").html("");
+        ws.codigo = undefined;
+        
         // Solicitar lista actualizada
         ws.solicitarLista();
     });

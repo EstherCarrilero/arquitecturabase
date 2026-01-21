@@ -342,10 +342,10 @@ function ControlWeb(){
         $("#estadoPartidaActual").show();
         
         $("#estadoPartida").html(`
-            <div class="alert alert-info">
-                <h6><i class="fas fa-spinner fa-spin"></i> Esperando rival...</h6>
-                <p class="mb-1">Código de partida: <strong>${codigo}</strong></p>
-                <small>Comparte este código con otro jugador para que se una</small>
+            <div class="alert alert-info text-center">
+                <h3 class="mb-3"><i class="fas fa-spinner fa-spin"></i> Esperando jugador...</h3>
+                <p class="mb-2">Código de partida: <strong class="codigo-partida">${codigo}</strong></p>
+                <p class="mb-0 text-muted small">Comparte este código con otro jugador para que se una</p>
             </div>
         `);
     }
@@ -358,34 +358,14 @@ function ControlWeb(){
         // Determinar si este usuario es el creador
         let nick = $.cookie("nick");
         let esCreador = ws.esCreadorPartida || false; // Flag que se debe setear al crear partida
-        
-        let selectorNivel = '';
-        if (esCreador) {
-            selectorNivel = `
-                <div class="mb-3">
-                    <h5>Selecciona el nivel:</h5>
-                    <div class="btn-group btn-group-toggle d-flex" data-toggle="buttons">
-                        <label class="btn btn-outline-success active flex-fill">
-                            <input type="radio" name="nivelOptions" id="nivel1" value="1" checked> Nivel 1 (Fácil)
-                        </label>
-                        <label class="btn btn-outline-danger flex-fill">
-                            <input type="radio" name="nivelOptions" id="nivel2" value="2"> Nivel 2 (Difícil)
-                        </label>
-                    </div>
-                    <small class="text-muted d-block mt-2">Nivel 1: Pocos enemigos, más champiñones<br>
-                    Nivel 2: Más enemigos, menos champiñones</small>
-                </div>
-            `;
-        }
-        
+
         $("#estadoPartida").html(`
             <div class="alert alert-success text-center">
                 <h4><i class="fas fa-check-circle"></i> ¡Partida completa!</h4>
                 <p class="mb-2">Código: <strong>${codigo}</strong></p>
                 <p class="mb-3">¡Ambos jugadores conectados!</p>
-                ${selectorNivel}
                 <button id="btnIniciarJuego" class="btn btn-primary btn-lg">
-                    <img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud"> Iniciar Juego
+                    <img src="./cliente/assets/images/hud_player_yellow.png" alt="Player" class="icon-hud"> Listo
                 </button>
                 <div id="estadoEspera" style="display:none; margin-top: 15px;">
                     <p class="text-info"><strong>Esperando a que el otro jugador esté listo...</strong></p>
@@ -395,19 +375,16 @@ function ControlWeb(){
                 </div>
             </div>
         `);
-        
+
         // Evento para indicar que este jugador está listo
         $("#btnIniciarJuego").off("click").on("click", function() {
             console.log("Jugador listo para iniciar");
-            
-            // Si es creador, enviar nivel seleccionado
-            let nivelSeleccionado = 1;
-            if (esCreador) {
-                nivelSeleccionado = parseInt($('input[name="nivelOptions"]:checked').val()) || 1;
-                console.log("Creador seleccionó nivel:", nivelSeleccionado);
-                ws.enviarNivelSeleccionado(codigo, nivelSeleccionado);
-            }
-            
+
+            // Nivel 1 por defecto
+            const nivelSeleccionado = 1;
+            // Enviar nivel 1 al servidor (si corresponde)
+            try { ws.enviarNivelSeleccionado(codigo, nivelSeleccionado); } catch(e) { console.warn(e); }
+
             // Enviar señal de que este jugador está listo
             ws.jugadorListo(codigo);
             // Deshabilitar botón y mostrar mensaje de espera
@@ -423,19 +400,29 @@ function ControlWeb(){
         $("#estadoPartidaActual").hide();
         $("#juegoContainer").show();
         
+        // Asegurar que no quede una instancia anterior
+        try {
+            if (window.juego) {
+                try { window.juego.destruir(); } catch(e) { console.warn('Error al destruir juego previo:', e); }
+                window.juego = null;
+            }
+            // Limpiar cualquier canvas o contenido residual dentro del contenedor del juego
+            $("#game").empty();
+        } catch (e) { console.warn('Error limpiando instancia previa del juego:', e); }
+
         // Crear instancia del juego Phaser
-        juego = new Juego();
-        juego.iniciar(codigo);
+        window.juego = new Juego();
+        window.juego.iniciar(codigo);
         
         // Configurar botón de salir del juego
         $("#btnSalirJuego").off("click").on("click", function() {
-            if (confirm("¿Seguro que quieres salir del juego? Se abandonará la partida.")) {
-                if (juego) {
-                    juego.destruir();
-                    juego = null;
+            if (confirm("¿Seguro que quieres salir del juego? Se abandonará la partida y se eliminará para ambos jugadores.")) {
+                // Enviar evento al servidor para eliminar partida y echar a ambos jugadores
+                if (ws && ws.enviarGameOverExit) {
+                    ws.enviarGameOverExit(codigo);
                 }
-                $("#juegoContainer").hide();
-                cw.abandonarPartida();
+                
+                // El cleanup se hará cuando llegue el evento del servidor
             }
         });
     }
@@ -491,6 +478,19 @@ function ControlWeb(){
                 return;
             }
             ws.unirAPartida(codigo);
+        });
+
+        // Event listener para el filtro por código
+        $("#filtroCodigo").off('input').on('input', function(){
+            const q = $(this).val().trim().toLowerCase();
+            if (!q) {
+                $("#listaPartidas table tbody tr").show();
+                return;
+            }
+            $("#listaPartidas table tbody tr").each(function(){
+                const codigo = $(this).find('td:first code').text().toLowerCase();
+                if (codigo.indexOf(q) !== -1) $(this).show(); else $(this).hide();
+            });
         });
     }
 

@@ -21,9 +21,9 @@ class Jugador {
         this.sprite.body.setDragX(800);
         this.sprite.body.setMaxVelocity(250, 600);
 
-        // Crear indicador de dirección (mantener como rectángulo simple)
-        this.indicador = scene.add.rectangle(x + 16, y, 8, 32, 0xffff00);
-        // Asegurar que el indicador no participe en la física a menos que se agregue explicitamente
+        // Indicador de dirección (opcional) - deshabilitado por defecto
+        // Se mantiene la propiedad por compatibilidad, pero no se crea el objeto visual
+        this.indicador = null;
     }
     
     getSprite() {
@@ -237,24 +237,24 @@ class Jugador {
     mover(cursors, jumpPressed, reboteEnemigo) {
         if (!this.controlsEnabled) {
             // Mantener indicador alineado verticalmente incluso si controles deshabilitados
-            this.indicador.y = this.sprite.y;
+            if (this.indicador) this.indicador.y = this.sprite.y;
             return { jumpPressed, reboteEnemigo };
         }
         // Movimiento horizontal
         if (cursors.left.isDown) {
             this.sprite.body.setAccelerationX(-600);
             this.facing = 'left';
-            this.indicador.x = this.sprite.x - 20;
+            if (this.indicador) this.indicador.x = this.sprite.x - 20;
         } else if (cursors.right.isDown) {
             this.sprite.body.setAccelerationX(600);
             this.facing = 'right';
-            this.indicador.x = this.sprite.x + 20;
+            if (this.indicador) this.indicador.x = this.sprite.x + 20;
         } else {
             this.sprite.body.setAccelerationX(0);
         }
         
         // Mantener indicador alineado verticalmente
-        this.indicador.y = this.sprite.y;
+        if (this.indicador) this.indicador.y = this.sprite.y;
         
         // Animaciones básicas: caminar vs idle cuando está en el suelo
         try {

@@ -15,9 +15,40 @@ body {
     left: 0;
     width: 100%;
     height: 100vh;
-    overflow-y: auto;
+    overflow-y: auto; /* permitir scroll vertical si algún elemento no cabe */
+    -webkit-overflow-scrolling: touch; /* smooth scroll en iOS */
+    padding-top: 64px; /* desplazar contenido para que empiece después del navbar fijo */
     z-index: 1;
 }
+
+/* Notificaciones: franja contrastada bajo el navbar para que los alerts no se confundan con el fondo */
+#notificaciones {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    z-index: 2001;
+    display: flex;
+    justify-content: center;
+    pointer-events: none; /* que no bloquee clics fuera de las alertas */
+    padding: 8px 12px;
+}
+
+#notificaciones .alert {
+    pointer-events: auto;
+    max-width: 820px;
+    width: calc(100% - 32px);
+    background-color: rgba(0,0,0,0.78);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    border-radius: 10px;
+}
+
+/* Ajustes para alerts concretos si se quiere mantener color semántico */
+#notificaciones .alert.alert-success { background-color: rgba(40,167,69,0.9); }
+#notificaciones .alert.alert-danger  { background-color: rgba(220,53,69,0.92); }
+#notificaciones .alert.alert-info    { background-color: rgba(23,162,184,0.9); }
 
 /* Si el usuario proporciona su propia imagen personalizada: aplicable a #mainContent */
 #mainContent.custom-bg, .custom-bg {
@@ -142,10 +173,37 @@ body {
 
 /* Fondo para la sección de partidas */
 .fondo-partidas {
-    background: #ffffff;
+    background-color: #ffffff; /* fallback */
+    background-image: url('./img/fondo_wonder_alien_mejorado.jpeg');
+    background-size: cover;
+    background-position: top center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     min-height: 100vh;
     padding: 40px 0;
     position: relative;
+}
+
+/* Sección partidas: contener y evitar que la página principal haga scroll
+   Solo el listado de partidas deberá hacer scroll cuando sea necesario */
+#seccionPartidas {
+    min-height: calc(100vh - 56px); /* espacio para navbar */
+    overflow-y: auto; /* permitir scroll dentro de la sección si es necesario */
+    -webkit-overflow-scrolling: touch;
+    padding-top: 12px; /* reducir espacio superior para acercar el contenido al navbar */
+}
+
+/* Lista de partidas: scroll independiente cuando sobrepase la altura disponible */
+#listaPartidas {
+    max-height: calc(100vh - 460px); /* ajustar según el contenido arriba (cabecera + crear card) */
+    overflow-y: auto;
+    padding-right: 8px; /* espacio para scrollbar */
+}
+
+@media (max-width: 768px) {
+    #listaPartidas {
+        max-height: calc(100vh - 520px);
+    }
 }
 
 /* Cards de partidas mejoradas */
@@ -217,6 +275,29 @@ nav#mainNavbar.navbar-custom.navbar-partidas {
     border-color: rgba(255,255,255,0.12) !important;
 }
 
+/* Navbar brand icon and text */
+.icon-hud-navbar{
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+    margin-right: 10px;
+}
+.brand-text{
+    font-weight: 700;
+    color: #ffffff;
+    margin-left: 4px;
+}
+
+/* Ensure brand text is dark when not in partidas mode */
+.navbar-custom .brand-text{
+    color: #1e3a8a;
+}
+
+/* When in partidas mode, force brand text white */
+.navbar-custom.navbar-partidas .brand-text{
+    color: #ffffff !important;
+}
+
 .navbar-custom.navbar-dark {
     background: transparent !important;
     background-color: transparent !important;
@@ -235,9 +316,45 @@ nav#mainNavbar.navbar-custom.navbar-partidas {
 
 /* Contenedor de juego */
 #juegoContainer {
-    background: rgba(0, 0, 0, 0.8);
-    padding: 20px;
-    border-radius: 15px;
+    background: transparent; /* dejar el fondo del juego sin overlay */
+    border-radius: 8px;
+    margin-top: 0px; /* acercar aún más el contenedor hacia el navbar */
+    width: 100%;
+    display: flex;
+    justify-content: center; /* centrar horizontalmente */
+    align-items: flex-start;  /* colocar el contenido en la parte superior para subir la card */
+    padding: 8px 12px 20px; /* menos espacio superior para subir la card */
+    min-height: auto; /* permitir que el contenedor se ajuste y quede cerca del navbar */
+}
+
+/* Borde muy fino y sombra mínima alrededor del card del juego */
+#juegoContainer .card {
+    border: 1px solid rgba(0,0,0,0.06) !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+    max-width: 1160px; /* limitar anchura máxima para que la card quede centrada */
+    width: 100%;
+    margin: 0 auto;
+}
+
+#juegoContainer .card .card-body {
+    padding: 8px !important;
+}
+
+/* Asegurar que el div del juego y el canvas queden centrados y responsivos */
+#game {
+    margin: 0 auto;
+    display: block;
+    width: 100%;
+    max-width: 1100px; /* coincide con el ancho de canvas configurado en Phaser */
+}
+
+#game canvas {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto !important;
 }
 
 /* Estilos para formularios dentro del modal */
@@ -352,4 +469,19 @@ nav#mainNavbar.navbar-custom.navbar-partidas {
     .sprite-right {
         right: 10px;
     }
+}
+
+/* Estilos para el filtro de código de partida */
+#filtroCodigo {
+    border-radius: 8px;
+}
+
+#filtroCodigo::placeholder {
+    color: #6c757d;
+}
+
+/* Estilo para el código de partida mostrado en la pantalla de espera */
+.codigo-partida{
+    font-size: 1.25rem;
+    letter-spacing: 1px;
 }

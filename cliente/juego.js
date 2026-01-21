@@ -1,7 +1,7 @@
 function Juego() {
     const config = {
         type: Phaser.AUTO,
-        width: 800,
+        width: 1100,
         height: 600,
         parent: 'game',
         backgroundColor: '#5c94fc',
@@ -85,9 +85,14 @@ function Juego() {
     let bandera, mastilBandera;
     let jugadorEnMeta = false;
     let otroJugadorEnMeta = false;
+    let timeoutVictoria = null; // Timeout de 10 segundos para victoria automática
+    let victoriaMostrada = false; // Evitar mostrar modal de victoria múltiples veces
     
     // Variable de nivel
     let nivelActual = 1; // 1 = Fácil, 2 = Difícil
+    
+    // Flag para evitar mostrar "Has muerto" si ambos jugadores mueren
+    let esperandoAmbosJugadoresMuertos = false;
 
     this.iniciar = function(codigoPartida) {
         codigo = codigoPartida;
@@ -1102,10 +1107,10 @@ function Juego() {
         if (numero === 1) {
             // Nivel 1 (Fácil): más champiñones
             posicionesChampi = [
-                {x: 300, y: 450},   // Cerca del inicio
-                {x: 900, y: 300},   // Sobre una plataforma media
-                {x: 1200, y: 450},
-                {x: 1500, y: 450}
+                //{x: 300, y: 450},   // Cerca del inicio
+                {x: 900, y: 300}   // Sobre una plataforma media
+                //{x: 1200, y: 450},
+                //{x: 1500, y: 450}
             ];
         } else {
             // Nivel 2 (Difícil): menos champiñones
@@ -1340,7 +1345,8 @@ function Juego() {
         // Zoom ligeramente out para ver más del nivel
         camara.setZoom(1);
         // Dead zone: área donde el jugador puede moverse sin que la cámara se mueva
-        camara.setDeadzone(150, 100);
+        // Aumentado horizontalmente para que el jugador tenga más visión lateral
+        camara.setDeadzone(200, 100);
         // Lerp: suavizado del movimiento de la cámara
         camara.setLerp(0.1, 0.1);
 
@@ -1447,10 +1453,16 @@ function Juego() {
         
         // Recibir puntuación del rival
         ws.socket.on("actualizacionPuntuacion", function(datos) {
-            if (datos && datos.puntuacion !== undefined) {
-                puntuacionOtro = datos.puntuacion;
-                if (textoOtroPuntuacionTens) {
-                    setHudTwoDigits(textoOtroPuntuacionTens, textoOtroPuntuacionUnits, puntuacionOtro);
+            if (datos) {
+                if (typeof datos.puntuacion !== 'undefined') {
+                    puntuacionOtro = datos.puntuacion;
+                    if (textoOtroPuntuacionTens) {
+                        setHudTwoDigits(textoOtroPuntuacionTens, textoOtroPuntuacionUnits, puntuacionOtro);
+                    }
+                }
+                // Si vienen los puntos totales, mantener puntosOtro sincronizado
+                if (typeof datos.puntos !== 'undefined') {
+                    puntosOtro = datos.puntos;
                 }
             }
         });
@@ -1544,11 +1556,48 @@ function Juego() {
             }
         });
         
+        // Recibir notificación de que ambos jugadores han muerto
+        ws.socket.on("ambosJugadoresMuertos", function(datos) {
+            console.log("Evento ambosJugadoresMuertos recibido:", datos);
+            if (datos && datos.codigo === codigo) {
+                // Marcar flag para cancelar modal individual si estaba pendiente
+                esperandoAmbosJugadoresMuertos = false;
+                // Mostrar modal de GAME OVER con opciones Reintentar/Salir
+                mostrarModalAmbosJugadoresMuertos();
+            }
+        });
+        
         // Recibir champiñones recogidos por el rival
         ws.socket.on("champinonRecogido", function(datos) {
-            console.log("Champiñón recogido por otro jugador (ID:", datos.champinonId, ")");
-            // Eliminar el champiñón en la pantalla de este jugador
-            eliminarChampinon(datos.champinonId);
+            console.log("Champiñón recogido por otro jugador (ID:", datos.champinonId, ")", datos.x ? ('pos=' + datos.x + ',' + datos.y) : '');
+            // Intentar eliminar por ID
+            try {
+                let ok = eliminarChampinon(datos.champinonId);
+                if (!ok) {
+                    // Si no se encontró por ID, intentar eliminar por proximidad (coordenadas opcionales)
+                    if (typeof datos.x !== 'undefined' && typeof datos.y !== 'undefined') {
+                        let mejor = null;
+                        let mejorDist = Infinity;
+                        champinones.getChildren().forEach(champiSprite => {
+                            if (!champiSprite.champRef || !champiSprite.champRef.isActivo()) return;
+                            let dx = (champiSprite.x || 0) - datos.x;
+                            let dy = (champiSprite.y || 0) - datos.y;
+                            let d = Math.sqrt(dx*dx + dy*dy);
+                            if (d < mejorDist) { mejorDist = d; mejor = champiSprite; }
+                        });
+                        // Si la distancia es razonable, recogerlo
+                        if (mejor && mejorDist < 64) {
+                            try { mejor.champRef.recoger(); console.log('Champiñón eliminado por proximidad (dist=', mejorDist, ')'); } catch(e) {}
+                        } else {
+                            console.warn('No se encontró champiñón remoto por ID ni por proximidad');
+                        }
+                    } else {
+                        console.warn('No se encontró champiñón remoto por ID y no se proporcionaron coordenadas');
+                    }
+                }
+            } catch (e) {
+                console.warn('Error al procesar champinonRecogido:', e);
+            }
         });
         
         // Recibir bloques rotos por el rival
@@ -1667,8 +1716,30 @@ function Juego() {
             if (datos.puntos !== undefined) {
                 puntosOtro = datos.puntos;
             }
-            // Si ambos han llegado, mostrar victoria
+            // Si ambos han llegado, cancelar timeout y mostrar victoria
             if (jugadorEnMeta && otroJugadorEnMeta) {
+                // Cancelar timeout si existía
+                if (timeoutVictoria) {
+                    clearTimeout(timeoutVictoria);
+                    timeoutVictoria = null;
+                    console.log("Timeout de victoria cancelado - segundo jugador llegó a tiempo");
+                }
+                if (!victoriaMostrada) {
+                    victoriaMostrada = true;
+                    mostrarVictoria();
+                }
+            }
+        });
+
+        // Recibir notificación de victoria por timeout (mostrar victoria a ambos jugadores)
+        ws.socket.on("victoriaTimeout", function(datos) {
+            console.log("Evento victoriaTimeout recibido:", datos);
+            // Marcar que el otro jugador llegó (para consistencia) y mostrar victoria
+            otroJugadorEnMeta = true;
+            // No sobrescribir `puntosOtro` desde este evento (podría ser el propio remitente).
+            // `puntosOtro` debería venir sincronizado mediante "actualizacionPuntuacion".
+            if (!victoriaMostrada) {
+                victoriaMostrada = true;
                 mostrarVictoria();
             }
         });
@@ -1688,7 +1759,8 @@ function Juego() {
         // Enviar actualización de puntuación al servidor
         ws.enviarPuntuacion({
             codigo: codigo,
-            puntuacion: puntuacionJugador
+            puntuacion: puntuacionJugador,
+            puntos: puntosJugador
         });
         
         // Enviar qué moneda se recogió para sincronizar con el otro jugador
@@ -1891,14 +1963,30 @@ function Juego() {
     function checkOverlapVertical(jugador, bloque) {
         // Verificar si la cabeza del jugador está tocando la parte inferior del bloque
         let jugadorCabezaY = jugador.y - (jugador.displayHeight / 2);
-        let bloqueBaseY = bloque.y + 15; // Parte inferior del bloque (bloque tiene altura 30, mitad = 15)
-        
+        // Intentar usar displayHeight del bloque si está disponible
+        let bloqueHalfHeight = (bloque.displayHeight && bloque.displayHeight > 0) ? bloque.displayHeight / 2 : 15;
+        let bloqueBaseY = bloque.y + bloqueHalfHeight; // estimación de la base del bloque
+
         let distanciaVertical = Math.abs(jugadorCabezaY - bloqueBaseY);
         let distanciaHorizontal = Math.abs(jugador.x - bloque.x);
-        
-        // Debe estar cerca verticalmente (cabeza tocando base) y alineado horizontalmente
-        // Aumentada la tolerancia para mejor detección
-        return distanciaVertical < 10 && distanciaHorizontal < (jugador.displayWidth/2 + 20);
+
+        // Umbrales usados para la detección
+        const umbralVertical = 12; // px
+        const umbralHorizontal = (jugador.displayWidth / 2) + 20;
+
+        // Logs de depuración
+        try {
+            console.debug('[checkOverlapVertical] jugador.x=', jugador.x, 'jugador.y=', jugador.y, 'displayWidth=', jugador.displayWidth, 'displayHeight=', jugador.displayHeight);
+            console.debug('[checkOverlapVertical] jugadorCabezaY=', jugadorCabezaY);
+            console.debug('[checkOverlapVertical] bloque.x=', bloque.x, 'bloque.y=', bloque.y, 'bloque.displayHeight=', bloque.displayHeight, 'bloqueHalfHeight=', bloqueHalfHeight);
+            console.debug('[checkOverlapVertical] distanciaVertical=', distanciaVertical, 'distanciaHorizontal=', distanciaHorizontal, 'umbralV=', umbralVertical, 'umbralH=', umbralHorizontal);
+        } catch (e) {
+            console.warn('[checkOverlapVertical] error al loguear:', e);
+        }
+
+        const resultado = distanciaVertical < umbralVertical && distanciaHorizontal < umbralHorizontal;
+        console.debug('[checkOverlapVertical] resultado=', resultado);
+        return resultado;
     }
     
     // Función para calcular puntos según combo
@@ -1995,11 +2083,15 @@ function Juego() {
     
     // Función para eliminar champiñón visualmente
     function eliminarChampinon(champiId) {
+        let encontrado = false;
         champinones.getChildren().forEach(champiSprite => {
+            if (encontrado) return;
             if (champiSprite.champRef && champiSprite.champRef.getId() === champiId) {
                 champiSprite.champRef.recoger();
+                encontrado = true;
             }
         });
+        return encontrado;
     }
     
     // Función para romper bloque
@@ -2154,10 +2246,18 @@ function Juego() {
             grande: true
         });
         
-        ws.enviarChampinonRecogido({
-            codigo: codigo,
-            champinonId: champi.getId()
-        });
+        // Enviar también posición para facilitar sincronización si los IDs difieren
+        try {
+            let spr = champi.getSprite ? champi.getSprite() : null;
+            ws.enviarChampinonRecogido({
+                codigo: codigo,
+                champinonId: champi.getId(),
+                x: spr ? spr.x : undefined,
+                y: spr ? spr.y : undefined
+            });
+        } catch (e) {
+            ws.enviarChampinonRecogido({ codigo: codigo, champinonId: champi.getId() });
+        }
         
         console.log("Estado jugador grande:", jugadorPrincipal.esGrande());
     }
@@ -2200,9 +2300,31 @@ function Juego() {
         // Notificar al servidor con los puntos
         ws.enviarJugadorLlegoMeta({ codigo: codigo, puntos: puntosJugador });
         
-        // Si el otro jugador ya llegó, mostrar victoria
+        // Si el otro jugador ya llegó, mostrar victoria inmediata
         if (otroJugadorEnMeta) {
-            mostrarVictoria();
+            // Cancelar timeout si existía
+            if (timeoutVictoria) {
+                clearTimeout(timeoutVictoria);
+                timeoutVictoria = null;
+                console.log("Timeout de victoria cancelado - ambos jugadores llegaron");
+            }
+            if (!victoriaMostrada) {
+                victoriaMostrada = true;
+                mostrarVictoria();
+            }
+        } else {
+            // Iniciar temporizador de 10 segundos para victoria automática
+            console.log("Iniciando temporizador de 10 segundos para victoria...");
+            timeoutVictoria = setTimeout(function() {
+                console.log("¡Tiempo agotado! Mostrando victoria automática");
+                timeoutVictoria = null;
+                if (!victoriaMostrada) {
+                    victoriaMostrada = true;
+                    // Notificar al servidor para que reenvíe la victoria a ambos jugadores
+                    try { ws.enviarVictoriaTimeout({ codigo: codigo, puntos: puntosJugador }); } catch (e) { console.warn('Error enviando victoriaTimeout:', e); }
+                    mostrarVictoria();
+                }
+            }, 10000); // 10 segundos
         }
     }
     
@@ -2257,19 +2379,101 @@ function Juego() {
         let scene = game.scene.scenes[0];
         if (!scene) return;
 
+        // Ocultar y desactivar visualmente a ambos jugadores (mismo comportamiento que al morir)
+        try {
+            // Jugador local
+            if (player) {
+                if (player.setVisible) player.setVisible(false); else player.visible = false;
+                if (player.setActive) player.setActive(false);
+
+                if (player.body) {
+                    try {
+                        player.body.enable = false;
+                        if (player.body.checkCollision) player.body.checkCollision.none = true;
+                        if (typeof player.body.setSize === 'function') player.body.setSize(0, 0, false);
+                    } catch (inner) {}
+                }
+            }
+
+            // Instancia Jugador (por si el sprite está en la instancia)
+            if (typeof jugadorPrincipal !== 'undefined' && jugadorPrincipal) {
+                let spr = jugadorPrincipal.getSprite && jugadorPrincipal.getSprite();
+                if (spr && spr !== player) {
+                    if (spr.setVisible) spr.setVisible(false); else spr.visible = false;
+                    if (spr.setActive) spr.setActive(false);
+                    if (spr.body) {
+                        spr.body.enable = false;
+                        if (spr.body.checkCollision) spr.body.checkCollision.none = true;
+                        if (typeof spr.body.setSize === 'function') spr.body.setSize(0, 0, false);
+                    }
+                }
+
+                if (jugadorPrincipal.getIndicador) {
+                    let ind = jugadorPrincipal.getIndicador();
+                    if (ind) {
+                        if (ind.setVisible) ind.setVisible(false); else ind.visible = false;
+                        if (ind.body) ind.body.enable = false;
+                    }
+                }
+            }
+
+            // Otro jugador (remoto)
+            if (otroJugador) {
+                if (otroJugador.setVisible) otroJugador.setVisible(false); else otroJugador.visible = false;
+                if (otroJugador.body) {
+                    otroJugador.body.enable = false;
+                    if (otroJugador.body.checkCollision) otroJugador.body.checkCollision.none = true;
+                    if (typeof otroJugador.body.setSize === 'function') otroJugador.body.setSize(0, 0, false);
+                }
+            }
+
+            if (jugadorRemoto && typeof jugadorRemoto.getSprite === 'function') {
+                let spr2 = jugadorRemoto.getSprite();
+                if (spr2 && spr2 !== otroJugador) {
+                    if (spr2.setVisible) spr2.setVisible(false); else spr2.visible = false;
+                    if (spr2.setActive) spr2.setActive(false);
+                    if (spr2.body) {
+                        spr2.body.enable = false;
+                        if (spr2.body.checkCollision) spr2.body.checkCollision.none = true;
+                        if (typeof spr2.body.setSize === 'function') spr2.body.setSize(0, 0, false);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Error ocultando jugadores en victoria:', e);
+        }
+
+        // Asegurarse de que las instancias cancelen timers/estado interno (desactivar hitboxes internamente)
+        try {
+            if (jugadorPrincipal && typeof jugadorPrincipal.morir === 'function') {
+                jugadorPrincipal.morir();
+            }
+        } catch (e) { console.warn('Error llamando jugadorPrincipal.morir() en victoria:', e); }
+
+        try {
+            if (jugadorRemoto && typeof jugadorRemoto.morir === 'function') {
+                jugadorRemoto.morir();
+            }
+        } catch (e) { console.warn('Error llamando jugadorRemoto.morir() en victoria:', e); }
+
+        // Centrar modal en la cámara
+        let cam = scene.cameras.main;
+        let cx = cam.centerX;
+        let cy = cam.centerY;
+
         // Fondo semi-transparente que cubre toda la pantalla
-        let overlay = scene.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
+        let overlay = scene.add.rectangle(cx, cy, cam.width, cam.height, 0x000000, 0.7).setOrigin(0.5);
         overlay.setScrollFactor(0);
         overlay.setDepth(1000);
 
         // Panel central del modal
-        let modalBg = scene.add.rectangle(400, 300, 450, 280, 0x2c3e50);
+        let modalBg = scene.add.rectangle(cx, cy, 450, 280, 0x2c3e50).setOrigin(0.5);
         modalBg.setScrollFactor(0);
         modalBg.setDepth(1001);
         modalBg.setStrokeStyle(4, 0xf39c12);
 
         // Título "¡VICTORIA!"
-        let titulo = scene.add.text(400, 200, '¡VICTORIA!', {
+        let titulo = scene.add.text(cx, cy - 100, '¡VICTORIA!', {
             fontSize: '56px',
             fontStyle: 'bold',
             fill: '#f39c12',
@@ -2280,7 +2484,7 @@ function Juego() {
         titulo.setDepth(1002);
 
         // Mensaje
-        let mensaje = scene.add.text(400, 260, 'Ambos jugadores han llegado a la meta', {
+        let mensaje = scene.add.text(cx, cy - 40, 'Algún jugador ha llegado a la meta', {
             fontSize: '20px',
             fill: '#ecf0f1',
             fontFamily: 'Arial'
@@ -2288,7 +2492,7 @@ function Juego() {
         mensaje.setOrigin(0.5);
         mensaje.setScrollFactor(0);
         mensaje.setDepth(1002);
-        
+
         // Determinar ganador
         let ganador = '';
         if (puntosJugador > puntosOtro) {
@@ -2298,8 +2502,8 @@ function Juego() {
         } else {
             ganador = '¡Empate!';
         }
-        
-        let textoGanador = scene.add.text(400, 295, ganador, {
+
+        let textoGanador = scene.add.text(cx, cy - 5, ganador, {
             fontSize: '22px',
             fontStyle: 'bold',
             fill: puntosJugador > puntosOtro ? '#2ecc71' : (puntosOtro > puntosJugador ? '#e74c3c' : '#f39c12'),
@@ -2308,34 +2512,35 @@ function Juego() {
         textoGanador.setOrigin(0.5);
         textoGanador.setScrollFactor(0);
         textoGanador.setDepth(1002);
-        
+
         // Puntuaciones
-        let textoPuntosJugador = scene.add.text(400, 330, `Tus puntos: ${puntosJugador}`, {
+        let textoPuntosJugador = scene.add.text(cx, cy + 30, `Tus puntos: ${puntosJugador}`, {
             fontSize: '18px',
-            fill: '#3498db',
+            fill: '#faba2d',
             fontFamily: 'Arial'
         });
         textoPuntosJugador.setOrigin(0.5);
         textoPuntosJugador.setScrollFactor(0);
         textoPuntosJugador.setDepth(1002);
-        
-        let textoPuntosOtro = scene.add.text(400, 355, `Puntos rival: ${puntosOtro}`, {
+
+        let textoPuntosOtro = scene.add.text(cx, cy + 55, `Puntos rival: ${puntosOtro}`, {
             fontSize: '18px',
-            fill: '#9b59b6',
+            fill: '#ff8aae',
             fontFamily: 'Arial'
         });
         textoPuntosOtro.setOrigin(0.5);
         textoPuntosOtro.setScrollFactor(0);
         textoPuntosOtro.setDepth(1002);
 
-        // Botón "Aceptar"
-        let botonBg = scene.add.rectangle(400, 380, 150, 50, 0x27ae60);
+        // Botón "Salir" (comportamiento igual que SALIR en Game Over)
+        // Reducido y ligeramente más abajo para no tapar el texto
+        let botonBg = scene.add.rectangle(cx, cy + 100, 120, 44, 0xe74c3c).setOrigin(0.5);
         botonBg.setScrollFactor(0);
         botonBg.setDepth(1002);
         botonBg.setInteractive({ useHandCursor: true });
 
-        let botonTexto = scene.add.text(400, 380, 'ACEPTAR', {
-            fontSize: '24px',
+        let botonTexto = scene.add.text(cx, cy + 100, 'SALIR', {
+            fontSize: '20px',
             fontStyle: 'bold',
             fill: '#ffffff',
             fontFamily: 'Arial'
@@ -2344,26 +2549,20 @@ function Juego() {
         botonTexto.setScrollFactor(0);
         botonTexto.setDepth(1003);
 
-        // Efecto hover en el botón
+        // Efecto hover en el botón (rojo -> más oscuro)
         botonBg.on('pointerover', function() {
-            botonBg.setFillStyle(0x2ecc71);
+            botonBg.setFillStyle(0xc0392b);
         });
         botonBg.on('pointerout', function() {
-            botonBg.setFillStyle(0x27ae60);
+            botonBg.setFillStyle(0xe74c3c);
         });
 
-        // Al hacer clic en "Aceptar", cerrar el modal
+        // Al hacer clic en "Salir", notificar al servidor para terminar la partida
         botonBg.on('pointerdown', function() {
-            overlay.destroy();
-            modalBg.destroy();
-            titulo.destroy();
-            mensaje.destroy();
-            textoGanador.destroy();
-            textoPuntosJugador.destroy();
-            textoPuntosOtro.destroy();
-            botonBg.destroy();
-            botonTexto.destroy();
-            console.log("Modal de victoria cerrado");
+            console.log("Salir desde modal de victoria - enviando gameOverExit");
+            if (ws && ws.enviarGameOverExit && codigo) {
+                ws.enviarGameOverExit(codigo);
+            }
         });
     }
 
@@ -2448,8 +2647,16 @@ function Juego() {
             console.warn('Error al cambiar seguimiento de cámara:', e);
         }
 
-        // Mostrar modal de Game Over
-        mostrarModalGameOver();
+        // Esperar un momento antes de mostrar el modal individual
+        // para dar tiempo a que el servidor envíe "ambosJugadoresMuertos" si ambos murieron
+        esperandoAmbosJugadoresMuertos = true;
+        setTimeout(function() {
+            // Solo mostrar "Has muerto" si no recibimos "ambosJugadoresMuertos"
+            if (esperandoAmbosJugadoresMuertos) {
+                esperandoAmbosJugadoresMuertos = false;
+                mostrarModalGameOver();
+            }
+        }, 300); // 300ms de delay para recibir respuesta del servidor
     }
 
     function mostrarModalGameOver() {
@@ -2457,19 +2664,24 @@ function Juego() {
         let scene = game.scene.scenes[0];
         if (!scene) return;
 
+        // Centrar modal en la cámara
+        let cam = scene.cameras.main;
+        let cx = cam.centerX;
+        let cy = cam.centerY;
+
         // Fondo semi-transparente que cubre toda la pantalla
-        let overlay = scene.add.rectangle(400, 300, 800, 600, 0x000000, 0.7);
+        let overlay = scene.add.rectangle(cx, cy, cam.width, cam.height, 0x000000, 0.7).setOrigin(0.5);
         overlay.setScrollFactor(0);
         overlay.setDepth(1000);
 
         // Panel central del modal
-        let modalBg = scene.add.rectangle(400, 300, 400, 250, 0x2c3e50);
+        let modalBg = scene.add.rectangle(cx, cy, 400, 250, 0x2c3e50).setOrigin(0.5);
         modalBg.setScrollFactor(0);
         modalBg.setDepth(1001);
         modalBg.setStrokeStyle(4, 0xe74c3c);
 
-        // Título "GAME OVER"
-        let titulo = scene.add.text(400, 220, 'GAME OVER', {
+        // Título "¡Has muerto!"
+        let titulo = scene.add.text(cx, cy - 80, '¡Has muerto!', {
             fontSize: '48px',
             fontStyle: 'bold',
             fill: '#e74c3c',
@@ -2480,7 +2692,7 @@ function Juego() {
         titulo.setDepth(1002);
 
         // Mensaje
-        let mensaje = scene.add.text(400, 280, 'Has perdido todas tus vidas', {
+        let mensaje = scene.add.text(cx, cy - 20, 'Has perdido todas tus vidas', {
             fontSize: '20px',
             fill: '#ecf0f1',
             fontFamily: 'Arial'
@@ -2490,12 +2702,12 @@ function Juego() {
         mensaje.setDepth(1002);
 
         // Botón "Aceptar"
-        let botonBg = scene.add.rectangle(400, 350, 150, 50, 0x27ae60);
+        let botonBg = scene.add.rectangle(cx, cy + 50, 150, 50, 0x27ae60).setOrigin(0.5);
         botonBg.setScrollFactor(0);
         botonBg.setDepth(1002);
         botonBg.setInteractive({ useHandCursor: true });
 
-        let botonTexto = scene.add.text(400, 350, 'ACEPTAR', {
+        let botonTexto = scene.add.text(cx, cy + 50, 'ACEPTAR', {
             fontSize: '24px',
             fontStyle: 'bold',
             fill: '#ffffff',
@@ -2521,7 +2733,112 @@ function Juego() {
             mensaje.destroy();
             botonBg.destroy();
             botonTexto.destroy();
-            console.log("Modal de Game Over cerrado");
+            console.log("Modal de muerte individual cerrado");
+        });
+    }
+    
+    function mostrarModalAmbosJugadoresMuertos() {
+        // Modal cuando ambos jugadores han muerto
+        let scene = game.scene.scenes[0];
+        if (!scene) return;
+
+        // Centrar modal en la cámara
+        let cam = scene.cameras.main;
+        let cx = cam.centerX;
+        let cy = cam.centerY;
+
+        // Fondo semi-transparente
+        let overlay = scene.add.rectangle(cx, cy, cam.width, cam.height, 0x000000, 0.7).setOrigin(0.5);
+        overlay.setScrollFactor(0);
+        overlay.setDepth(1000);
+
+        // Panel central del modal
+        let modalBg = scene.add.rectangle(cx, cy, 450, 300, 0x2c3e50).setOrigin(0.5);
+        modalBg.setScrollFactor(0);
+        modalBg.setDepth(1001);
+        modalBg.setStrokeStyle(4, 0xe74c3c);
+
+        // Título "GAME OVER"
+        let titulo = scene.add.text(cx, cy - 100, 'GAME OVER', {
+            fontSize: '56px',
+            fontStyle: 'bold',
+            fill: '#e74c3c',
+            fontFamily: 'Arial'
+        });
+        titulo.setOrigin(0.5);
+        titulo.setScrollFactor(0);
+        titulo.setDepth(1002);
+
+        // Mensaje
+        let mensaje = scene.add.text(cx, cy - 30, 'Ambos jugadores han muerto', {
+            fontSize: '20px',
+            fill: '#ecf0f1',
+            fontFamily: 'Arial'
+        });
+        mensaje.setOrigin(0.5);
+        mensaje.setScrollFactor(0);
+        mensaje.setDepth(1002);
+
+        // Botón "Reintentar" (inerte)
+        let botonReintentarBg = scene.add.rectangle(cx - 80, cy + 50, 150, 50, 0x95a5a6).setOrigin(0.5);
+        botonReintentarBg.setScrollFactor(0);
+        botonReintentarBg.setDepth(1002);
+        botonReintentarBg.setInteractive({ useHandCursor: true });
+
+        let botonReintentarTexto = scene.add.text(cx - 80, cy + 50, 'REINTENTAR', {
+            fontSize: '20px',
+            fontStyle: 'bold',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        });
+        botonReintentarTexto.setOrigin(0.5);
+        botonReintentarTexto.setScrollFactor(0);
+        botonReintentarTexto.setDepth(1003);
+
+        // Botón "Salir"
+        let botonSalirBg = scene.add.rectangle(cx + 80, cy + 50, 150, 50, 0xe74c3c).setOrigin(0.5);
+        botonSalirBg.setScrollFactor(0);
+        botonSalirBg.setDepth(1002);
+        botonSalirBg.setInteractive({ useHandCursor: true });
+
+        let botonSalirTexto = scene.add.text(cx + 80, cy + 50, 'SALIR', {
+            fontSize: '24px',
+            fontStyle: 'bold',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        });
+        botonSalirTexto.setOrigin(0.5);
+        botonSalirTexto.setScrollFactor(0);
+        botonSalirTexto.setDepth(1003);
+
+        // Efectos hover
+        botonReintentarBg.on('pointerover', function() {
+            botonReintentarBg.setFillStyle(0xbdc3c7);
+        });
+        botonReintentarBg.on('pointerout', function() {
+            botonReintentarBg.setFillStyle(0x95a5a6);
+        });
+        
+        botonSalirBg.on('pointerover', function() {
+            botonSalirBg.setFillStyle(0xc0392b);
+        });
+        botonSalirBg.on('pointerout', function() {
+            botonSalirBg.setFillStyle(0xe74c3c);
+        });
+
+        // Botón Reintentar: inerte (no hace nada)
+        botonReintentarBg.on('pointerdown', function() {
+            console.log("Reintentar - función no implementada");
+        });
+
+        // Botón Salir: enviar gameOverExit para que ambos jugadores vuelvan al menú
+        botonSalirBg.on('pointerdown', function() {
+            console.log("Salir de GAME OVER - enviando gameOverExit");
+            // Enviar evento al servidor para eliminar partida y expulsar a ambos
+            if (ws && ws.enviarGameOverExit && codigo) {
+                ws.enviarGameOverExit(codigo);
+            }
+            // El cleanup se hará cuando llegue el evento del servidor
         });
     }
 
@@ -2538,17 +2855,21 @@ function Juego() {
                 if (jugadorPrincipal && typeof jugadorPrincipal.perderTodasVidas === 'function') {
                     esGameOver = jugadorPrincipal.perderTodasVidas();
                     if (textoMiVidas) setHudDigit(textoMiVidas, jugadorPrincipal.getVidas());
+                    // Notificar al servidor que las vidas han quedado en 0 para sincronizar HUD remoto
+                    try { ws.enviarVidas({ codigo: codigo, vidas: jugadorPrincipal.getVidas() }); } catch(e) { console.warn('Error enviando vidas tras perderTodasVidas:', e); }
                 } else if (jugadorPrincipal && typeof jugadorPrincipal.perderVida === 'function') {
                     // Fallback: si no existe el método, quitar todas las vidas manualmente
                     while (jugadorPrincipal.getVidas() > 0) jugadorPrincipal.perderVida();
                     esGameOver = true;
                     if (textoMiVidas) setHudDigit(textoMiVidas, jugadorPrincipal.getVidas());
+                    try { ws.enviarVidas({ codigo: codigo, vidas: jugadorPrincipal.getVidas() }); } catch(e) { console.warn('Error enviando vidas tras fallback perderVida loop:', e); }
                 } else {
                     // Fallback a variable legacy
                     if (typeof vidasJugador !== 'undefined') {
                         vidasJugador = 0;
                         if (textoMiVidas) setHudDigit(textoMiVidas, vidasJugador);
                         esGameOver = true;
+                        try { ws.enviarVidas({ codigo: codigo, vidas: 0 }); } catch(e) { console.warn('Error enviando vidas tras fallback legacy:', e); }
                     }
                 }
 
@@ -2903,12 +3224,25 @@ function Juego() {
         console.log("Destruyendo juego Phaser");
         if (game) {
             game.destroy(true);
-            // Limpiar listeners de WebSocket
-            ws.socket.off("actualizacionJuego");
-            ws.socket.off("actualizacionPuntuacion");
-            ws.socket.off("monedaRecogida");
-            ws.socket.off("goombaEliminado");
-            ws.socket.off("koopaEstadoCambiado");
+            // Limpiar listeners de WebSocket añadidos por este juego
+            try {
+                ws.socket.off("actualizacionJuego");
+                ws.socket.off("actualizacionPuntuacion");
+                ws.socket.off("monedaRecogida");
+                ws.socket.off("goombaEliminado");
+                ws.socket.off("koopaEstadoCambiado");
+                ws.socket.off("estadoGrandeCambiado");
+                ws.socket.off("jugadorMuerto");
+                ws.socket.off("ambosJugadoresMuertos");
+                ws.socket.off("champinonRecogido");
+                ws.socket.off("bloqueRoto");
+                ws.socket.off("bloquePreguntaGolpeado");
+                ws.socket.off("vidasActualizadas");
+                ws.socket.off("jugadorLlegoMeta");
+                ws.socket.off("victoriaTimeout");
+            } catch (e) {
+                console.warn('Error limpiando listeners WS en destruir():', e);
+            }
         }
     };
 }

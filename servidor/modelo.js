@@ -284,19 +284,11 @@ function Sistema(test){
         console.log("Jugadores en partida:", partida.jugadores);
         console.log("Email del creador (jugador[0]):", partida.jugadores[0] ? partida.jugadores[0].email : "N/A");
         
-        // Verificar si el usuario que abandona es el creador (primer jugador)
-        if (partida.jugadores.length > 0 && partida.jugadores[0].email === email) {
-            // Es el creador, eliminar la partida completamente
-            delete this.partidas[codigo];
-            console.log("✓ ES EL CREADOR - Partida eliminada:", codigo);
-            return {eliminada: true, esCreador: true};
-        } else {
-            // No es el creador, remover al jugador del array pero mantener la partida
-            partida.jugadores = partida.jugadores.filter(j => j.email !== email);
-            console.log("✗ NO ES EL CREADOR - Jugador removido, partida mantenida:", codigo);
-            console.log("Jugadores restantes:", partida.jugadores);
-            return {eliminada: false, esCreador: false};
-        }
+        // Eliminar la partida completamente cuando cualquier jugador la abandona
+        const fueCreador = (partida.jugadores.length > 0 && partida.jugadores[0].email === email);
+        delete this.partidas[codigo];
+        console.log("→ Partida eliminada por abandono (codigo):", codigo, "fueCreador:", fueCreador);
+        return {eliminada: true, esCreador: fueCreador};
     }
 
     this.obtenerPartidasDisponibles=function(){ 

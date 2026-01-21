@@ -59,29 +59,20 @@ function WSServer(){
                 console.log("Solicitud abandonarPartida recibida - Email:", datos.email, "Código:", datos.codigo);
                 
                 let resultado = sistema.abandonarPartida(datos.email, datos.codigo);
-                
-                if (resultado.eliminada) {
-                    // El creador abandonó - eliminar partida
-                    // Notificar a los jugadores de esa partida que fue eliminada
+                // Siempre notificar al resto de jugadores en la sala que la partida fue eliminada
+                // y que su compañero ha abandonado la partida. Luego actualizar la lista global.
+                try {
                     socket.broadcast.to(datos.codigo).emit("partidaEliminada", {
-                        mensaje: "El creador ha abandonado la partida. La partida ha sido eliminada."
+                        mensaje: "Tu compañero ha abandonado la partida"
                     });
-                    
-                    // Enviar lista actualizada a todos los clientes
-                    let lista = sistema.obtenerPartidasDisponibles();
-                    srv.enviarGlobal(io, "listaPartidas", lista);
-                } else {
-                    // Un jugador no-creador abandonó - notificar SOLO a los demás (el creador)
-                    socket.broadcast.to(datos.codigo).emit("jugadorAbandono", {
-                        codigo: datos.codigo,
-                        mensaje: "Un jugador ha abandonado la partida"
-                    });
-                    
-                    // Enviar lista actualizada a todos los clientes (la partida ahora tiene espacio)
-                    let lista = sistema.obtenerPartidasDisponibles();
-                    srv.enviarGlobal(io, "listaPartidas", lista);
+                } catch (e) {
+                    console.warn('Error notificando partidaEliminada:', e);
                 }
-                
+
+                // Enviar lista actualizada a todos los clientes
+                let lista = sistema.obtenerPartidasDisponibles();
+                srv.enviarGlobal(io, "listaPartidas", lista);
+
                 // Hacer que el socket salga de la sala de esa partida
                 socket.leave(datos.codigo);
                 console.log("Socket salió de la sala:", datos.codigo);
@@ -97,9 +88,15 @@ function WSServer(){
             
             socket.on("puntuacionJugador", function(datos){
                 // Reenviar la puntuación del jugador a los demás en la sala
-                socket.broadcast.to(datos.codigo).emit("actualizacionPuntuacion", {
-                    puntuacion: datos.puntuacion
-                });
+                try {
+                    let payload = {};
+                    if (typeof datos.puntuacion !== 'undefined') payload.puntuacion = datos.puntuacion;
+                    if (typeof datos.puntos !== 'undefined') payload.puntos = datos.puntos;
+                    socket.broadcast.to(datos.codigo).emit("actualizacionPuntuacion", payload);
+                } catch (e) {
+                    console.warn('Error reenviando puntuacionJugador:', e);
+                    socket.broadcast.to(datos.codigo).emit("actualizacionPuntuacion", { puntuacion: datos.puntuacion });
+                }
             });
             
             socket.on("recogerMoneda", function(datos){
@@ -134,9 +131,16 @@ function WSServer(){
             
             socket.on("recogerChampinon", function(datos){
                 // Reenviar qué champiñón fue recogido a los demás en la sala
-                socket.broadcast.to(datos.codigo).emit("champinonRecogido", {
-                    champinonId: datos.champinonId
-                });
+                // Incluir posición si viene para facilitar la sincronización en clientes
+                try {
+                    let payload = { champinonId: datos.champinonId };
+                    if (typeof datos.x !== 'undefined') payload.x = datos.x;
+                    if (typeof datos.y !== 'undefined') payload.y = datos.y;
+                    socket.broadcast.to(datos.codigo).emit("champinonRecogido", payload);
+                } catch (e) {
+                    console.warn('Error reenviando recogerChampinon:', e);
+                    socket.broadcast.to(datos.codigo).emit("champinonRecogido", { champinonId: datos.champinonId });
+                }
             });
             
             socket.on("romperBloque", function(datos){
@@ -172,6 +176,28 @@ function WSServer(){
                 socket.broadcast.to(datos.codigo).emit("jugadorMuerto", {
                     codigo: datos.codigo
                 });
+                
+                // Tracking de jugadores muertos para detectar GAME OVER de ambos
+                let partida = sistema.partidas[datos.codigo];
+                if (partida) {
+                    // Inicializar contador de muertos si no existe
+                    if (typeof partida.jugadoresMuertos === 'undefined') {
+                        partida.jugadoresMuertos = 0;
+                    }
+                    
+                    partida.jugadoresMuertos++;
+                    console.log("Jugador muerto en partida", datos.codigo + ". Total muertos:", partida.jugadoresMuertos, "de", partida.jugadores.length);
+                    
+                    // Si ambos jugadores han muerto, notificar a ambos
+                    if (partida.jugadoresMuertos >= partida.jugadores.length) {
+                        console.log("¡Ambos jugadores muertos en partida", datos.codigo + "! Enviando evento ambosJugadoresMuertos");
+                        io.to(datos.codigo).emit("ambosJugadoresMuertos", {
+                            codigo: datos.codigo
+                        });
+                        // Resetear contador para posibles reinicios
+                        partida.jugadoresMuertos = 0;
+                    }
+                }
             });
             
             socket.on("jugadorLlegoMeta", function(datos){
@@ -183,6 +209,18 @@ function WSServer(){
                 if (typeof datos.puntos !== 'undefined') payload.puntos = datos.puntos;
                 
                 socket.broadcast.to(datos.codigo).emit("jugadorLlegoMeta", payload);
+            });
+
+            socket.on("victoriaTimeout", function(datos){
+                // Reenviar a todos en la sala que la victoria por timeout ocurrió
+                try {
+                    let payload = { codigo: datos.codigo };
+                    if (typeof datos.puntos !== 'undefined') payload.puntos = datos.puntos;
+                    console.log("Victoria por timeout en partida", datos.codigo, "-> reenviando a sala");
+                    io.to(datos.codigo).emit("victoriaTimeout", payload);
+                } catch (e) {
+                    console.warn('Error reenviando victoriaTimeout:', e);
+                }
             });
             
             socket.on("nivelSeleccionado", function(datos){
@@ -224,6 +262,28 @@ function WSServer(){
                         partida.jugadoresListos = [];
                     }
                 }
+            });
+            
+            socket.on("gameOverExit", function(datos){
+                console.log("Evento gameOverExit recibido - Código:", datos.codigo);
+                
+                // Eliminar la partida del sistema
+                if (sistema.partidas[datos.codigo]) {
+                    delete sistema.partidas[datos.codigo];
+                    console.log("Partida eliminada por Game Over Exit:", datos.codigo);
+                }
+                
+                // Notificar a TODOS los jugadores en la sala (incluyendo quien lo envió)
+                // que la partida ha terminado y deben volver al menú
+                io.to(datos.codigo).emit("gameOverExit", {
+                    codigo: datos.codigo
+                });
+                
+                // Actualizar lista de partidas disponibles para todos
+                let lista = sistema.obtenerPartidasDisponibles();
+                srv.enviarGlobal(io, "listaPartidas", lista);
+                
+                console.log("Evento gameOverExit enviado a todos los clientes");
             });
         }); 
     } 
