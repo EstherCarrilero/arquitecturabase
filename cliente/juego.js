@@ -2779,30 +2779,14 @@ function Juego() {
         mensaje.setScrollFactor(0);
         mensaje.setDepth(1002);
 
-        // Botón "Reintentar" (inerte)
-        let botonReintentarBg = scene.add.rectangle(cx - 80, cy + 50, 150, 50, 0x95a5a6).setOrigin(0.5);
-        botonReintentarBg.setScrollFactor(0);
-        botonReintentarBg.setDepth(1002);
-        botonReintentarBg.setInteractive({ useHandCursor: true });
-
-        let botonReintentarTexto = scene.add.text(cx - 80, cy + 50, 'REINTENTAR', {
-            fontSize: '20px',
-            fontStyle: 'bold',
-            fill: '#ffffff',
-            fontFamily: 'Arial'
-        });
-        botonReintentarTexto.setOrigin(0.5);
-        botonReintentarTexto.setScrollFactor(0);
-        botonReintentarTexto.setDepth(1003);
-
-        // Botón "Salir"
-        let botonSalirBg = scene.add.rectangle(cx + 80, cy + 50, 150, 50, 0xe74c3c).setOrigin(0.5);
+        // Botón "Salir" (única opción)
+        let botonSalirBg = scene.add.rectangle(cx, cy + 50, 200, 60, 0xe74c3c).setOrigin(0.5);
         botonSalirBg.setScrollFactor(0);
         botonSalirBg.setDepth(1002);
         botonSalirBg.setInteractive({ useHandCursor: true });
 
-        let botonSalirTexto = scene.add.text(cx + 80, cy + 50, 'SALIR', {
-            fontSize: '24px',
+        let botonSalirTexto = scene.add.text(cx, cy + 50, 'SALIR', {
+            fontSize: '26px',
             fontStyle: 'bold',
             fill: '#ffffff',
             fontFamily: 'Arial'
@@ -2812,23 +2796,11 @@ function Juego() {
         botonSalirTexto.setDepth(1003);
 
         // Efectos hover
-        botonReintentarBg.on('pointerover', function() {
-            botonReintentarBg.setFillStyle(0xbdc3c7);
-        });
-        botonReintentarBg.on('pointerout', function() {
-            botonReintentarBg.setFillStyle(0x95a5a6);
-        });
-        
         botonSalirBg.on('pointerover', function() {
             botonSalirBg.setFillStyle(0xc0392b);
         });
         botonSalirBg.on('pointerout', function() {
             botonSalirBg.setFillStyle(0xe74c3c);
-        });
-
-        // Botón Reintentar: inerte (no hace nada)
-        botonReintentarBg.on('pointerdown', function() {
-            console.log("Reintentar - función no implementada");
         });
 
         // Botón Salir: enviar gameOverExit para que ambos jugadores vuelvan al menú

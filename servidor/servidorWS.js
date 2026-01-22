@@ -10,8 +10,8 @@ function WSServer(){
             srv.enviarAlRemitente(socket, "listaPartidas", lista);
             
             socket.on("crearPartida",function(datos){ 
-                console.log("Solicitud crearPartida recibida con email:", datos.email);
-                sistema.crearPartida(datos.email, function(res) {
+                console.log("Solicitud crearPartida recibida con email:", datos.email, "socket:", socket.id);
+                sistema.crearPartida(datos.email, socket.id, function(res) {
                     console.log("Resultado de crearPartida:", res);
                     if (res.codigo != -1){ 
                         socket.join(res.codigo); 
@@ -26,9 +26,9 @@ function WSServer(){
             });
             
             socket.on("unirAPartida",function(datos){
-                console.log("Solicitud unirAPartida recibida - Email:", datos.email, "Código:", datos.codigo);
+                console.log("Solicitud unirAPartida recibida - Email:", datos.email, "Código:", datos.codigo, "socket:", socket.id);
                 // Pedir a sistema unir a partida
-                sistema.unirAPartida(datos.email, datos.codigo, function(res) {
+                sistema.unirAPartida(datos.email, datos.codigo, socket.id, function(res) {
                     console.log("Resultado de unirAPartida:", res);
                     // Unirse al socket si el código no es -1
                     if (res.codigo != -1) {
@@ -233,7 +233,7 @@ function WSServer(){
             });
             
             socket.on("jugadorListo", function(datos){
-                console.log("Jugador listo recibido - Email:", datos.email, "Código:", datos.codigo);
+                console.log("Jugador listo recibido - Email:", datos.email, "Código:", datos.codigo, "socket:", socket.id);
                 
                 // Obtener la partida del sistema
                 let partida = sistema.partidas[datos.codigo];
@@ -244,10 +244,14 @@ function WSServer(){
                         partida.jugadoresListos = [];
                     }
                     
-                    // Marcar este jugador como listo (si no está ya)
-                    if (!partida.jugadoresListos.includes(datos.email)) {
-                        partida.jugadoresListos.push(datos.email);
+                    // Marcar este jugador como listo usando socket.id para evitar duplicados
+                    // Esto permite que dos pestañas con el mismo email funcionen correctamente
+                    const jugadorId = socket.id;
+                    if (!partida.jugadoresListos.includes(jugadorId)) {
+                        partida.jugadoresListos.push(jugadorId);
                         console.log("Jugadores listos en partida", datos.codigo + ":", partida.jugadoresListos.length, "de", partida.jugadores.length);
+                    } else {
+                        console.log("Socket", socket.id, "ya estaba marcado como listo");
                     }
                     
                     // Verificar si todos los jugadores están listos

@@ -159,7 +159,7 @@ app.post("/registrarUsuario", function(request, response){
     }); 
 });
 
-app.post("/iniciarSesion", passport.authenticate("local",{failureRedirect:"/fallo",successRedirect: "/ok"}), function(request, response){ 
+app.post("/iniciarSesion", function(request, response){ 
     const { email, password } = request.body;
     
     console.log("Intento de login:", email);
@@ -170,6 +170,7 @@ app.post("/iniciarSesion", passport.authenticate("local",{failureRedirect:"/fall
     }, function(res){ 
         if (res && res.nick && res.nick !== -1) {
             // Login exitoso
+            console.log("Login exitoso, enviando respuesta:", res);
             response.send({
                 nick: res.nick,
                 email: res.email,
@@ -178,6 +179,7 @@ app.post("/iniciarSesion", passport.authenticate("local",{failureRedirect:"/fall
             }); 
         } else {
             // Error en login
+            console.log("Error en login:", res.error);
             response.status(401).send({
                 nick: -1,
                 error: res.error || "Credenciales incorrectas"

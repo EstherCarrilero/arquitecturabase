@@ -142,15 +142,18 @@ function ClienteRest(){
             success:function(data){ 
                 if (data.nick && data.nick !== -1){              
                     console.log("Sesión iniciada: "+data.nick); 
-                    $.cookie("nick", data.nick); 
-                    ws.email=data.email; 
+                    console.log("Email del usuario:", data.email);
+                    
+                    // Guardar el email en la cookie (data.nick y data.email son el mismo valor)
+                    $.cookie("nick", data.email || data.nick); 
+                    
                     cw.limpiarLogin(); 
                     
                     // Cerrar el modal
                     cw.cerrarModalLogin();
                     
                     // Mostrar mensaje de bienvenida temporal
-                    cw.mostrarBienvenidaTemporal(data.email);
+                    cw.mostrarBienvenidaTemporal(data.email || data.nick);
                 } 
                 else{ 
                     console.log("Error en login:", data.error || "Credenciales incorrectas"); 

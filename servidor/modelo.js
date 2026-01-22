@@ -194,7 +194,7 @@ function Sistema(test){
         }) 
     } 
 
-    this.crearPartida=function(email, callback){ 
+    this.crearPartida=function(email, socketId, callback){ 
         let modelo = this;
         
         // Buscar el usuario en la base de datos
@@ -211,7 +211,8 @@ function Sistema(test){
                     partida.jugadores.push({
                         email: usuario.email,
                         nick: usuario.nick || usuario.email,
-                        nombre: usuario.nombre
+                        nombre: usuario.nombre,
+                        socketId: socketId // Guardar el socketId
                     });
                     
                     // Guardar la partida en la colección
@@ -226,7 +227,7 @@ function Sistema(test){
         });
     }
 
-    this.unirAPartida=function(email, codigo, callback){
+    this.unirAPartida=function(email, codigo, socketId, callback){
         let modelo = this;
         
         // Obtener la partida cuyo código es "codigo"
@@ -245,19 +246,20 @@ function Sistema(test){
                     // Verificar que la partida no esté llena
                     if (partida.jugadores.length < partida.maxJug) {
                         // Verificar que el usuario no esté ya en la partida
-                        let yaEnPartida = partida.jugadores.some(j => j.email === email);
-                        if (!yaEnPartida) {
+                        // let yaEnPartida = partida.jugadores.some(j => j.email === email);
+                        // if (!yaEnPartida) {
                             // Asignar al usuario a la partida
                             partida.jugadores.push({
                                 email: usuario.email,
                                 nick: usuario.nick || usuario.email,
-                                nombre: usuario.nombre
+                                nombre: usuario.nombre,
+                                socketId: socketId // Guardar el socketId
                             });
                             callback({codigo: codigo});
-                        } else {
-                            console.log("El usuario ya está en la partida");
-                            callback({codigo: -1, error: "Usuario ya en partida"});
-                        }
+                        // } else {
+                        //     console.log("El usuario ya está en la partida");
+                        //     callback({codigo: -1, error: "Usuario ya en partida"});
+                        // }
                     } else {
                         console.log("La partida está llena");
                         callback({codigo: -1, error: "Partida llena"});

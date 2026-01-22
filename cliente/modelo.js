@@ -219,16 +219,16 @@ function Sistema(test){
         if (usuario && partida) {
             // Verificar que la partida no esté llena
             if (partida.jugadores.length < partida.maxJug) {
-                // Verificar que el usuario no esté ya en la partida
-                let yaEnPartida = partida.jugadores.some(j => j.email === email);
-                if (!yaEnPartida) {
+                // // Verificar que el usuario no esté ya en la partida
+                // let yaEnPartida = partida.jugadores.some(j => j.email === email);
+                // if (!yaEnPartida) {
                     // Asignar al usuario a la partida
                     partida.jugadores.push(usuario);
                     return {codigo: codigo};
-                } else {
-                    console.log("El usuario ya está en la partida");
-                    return {codigo: -1, error: "Usuario ya en partida"};
-                }
+                // } else {
+                //     console.log("El usuario ya está en la partida");
+                //     return {codigo: -1, error: "Usuario ya en partida"};
+                // }
             } else {
                 console.log("La partida está llena");
                 return {codigo: -1, error: "Partida llena"};
