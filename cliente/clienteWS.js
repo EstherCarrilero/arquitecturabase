@@ -8,7 +8,7 @@ function ClienteWS(){
 
     this.crearPartida=function(){ 
         // Obtener el email de la cookie de sesión
-        let email = $.cookie("nick"); // La cookie guarda el email en "nick"
+        let email = $.cookie("nick");
         console.log("Email obtenido de la cookie:", email);
         if (email) {
             console.log("Enviando solicitud para crear partida con email:", email);
